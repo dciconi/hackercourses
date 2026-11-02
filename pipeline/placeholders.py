@@ -9,6 +9,7 @@ from html import escape
 from classify import OTHER, ROOT, TOPICS
 
 OUT = ROOT / "site" / "img" / "topics"
+OG = ROOT / "site" / "img" / "og"  # PNG social cards: topic art + one for the site
 INK = "#f6efe2"
 ACCENT = "#ff7a1f"
 W, H = 640, 360
@@ -157,13 +158,35 @@ def svg(topic):
 """
 
 
+SITE_CARD = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+<defs><pattern id="d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.8" fill="{INK}" opacity=".10"/></pattern></defs>
+<rect width="1200" height="630" fill="#1b1a15"/><rect width="1200" height="630" fill="url(#d)"/>
+<rect x="96" y="150" width="120" height="120" rx="26" fill="{ACCENT}"/>
+<path d="M130 188h52M130 210h38M130 232h22" stroke="#fff" stroke-width="11" stroke-linecap="round"/>
+<text x="246" y="240" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="700" fill="{INK}">Hacker Courses</text>
+<text x="100" y="380" font-family="Segoe UI, Arial, sans-serif" font-size="46" fill="{INK}" opacity=".85">The online courses programmers keep recommending,</text>
+<text x="100" y="442" font-family="Segoe UI, Arial, sans-serif" font-size="46" fill="{INK}" opacity=".85">ranked from 18 years of public comments.</text>
+<rect x="100" y="510" width="210" height="8" rx="4" fill="{ACCENT}"/>
+</svg>"""
+
+
+def png(svg_text, width, height):
+    """Rasterize for social previews, which don't accept SVG."""
+    import resvg_py
+    return bytes(resvg_py.svg_to_bytes(svg_string=svg_text, width=width, height=height))
+
+
 def main():
     names = [name for name, _ in TOPICS] + [OTHER]
     assert set(names) == set(MOTIFS), "every topic needs a motif"
     OUT.mkdir(parents=True, exist_ok=True)
+    OG.mkdir(parents=True, exist_ok=True)
     for topic in names:
-        (OUT / f"{slug(topic)}.svg").write_text(svg(topic), encoding="utf-8")
-    print(f"wrote {len(names)} placeholders to {OUT}")
+        art = svg(topic)
+        (OUT / f"{slug(topic)}.svg").write_text(art, encoding="utf-8")
+        (OG / f"{slug(topic)}.png").write_bytes(png(art, 1200, 675))
+    (OG / "site.png").write_bytes(png(SITE_CARD, 1200, 630))
+    print(f"wrote {len(names)} placeholders to {OUT} and social cards to {OG}")
 
 
 if __name__ == "__main__":

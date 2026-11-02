@@ -7,12 +7,18 @@ import json
 import time
 from collections import Counter, defaultdict
 
+import pages
 import rank
-from classify import OTHER, OUT_JS, ROOT, TOPICS
+from classify import OTHER, ROOT, TOPICS
 from images import OUT as IMAGES
 from summarize import SUMMARIES, THREADS, course_comments
 
 STANCE_CODE = {"strongly_recommends": 3, "recommends": 2, "mentions": 1, "criticizes": 0}
+COURSES_JS = ROOT / "site" / "courses.js"
+OLD_DATA_JS = ROOT / "site" / "data.js"  # pre-static-pages bundle with every comment
+GRID_FIELDS = ("id", "slug", "name", "provider", "topic", "summary", "why", "level", "cost", "format", "tags",
+               "score", "trend", "recommenders", "threads", "first", "last", "years_active", "rank", "badges",
+               "img", "imgTall")
 
 
 def main():
@@ -97,17 +103,24 @@ def main():
         for k in ("strong_share", "recent_share"):
             c[k] = round(c[k], 2)
 
+    taken = set()
+    for c in courses:
+        c["slug"] = pages.slugify(c["name"], taken)
+
+    # The grid only needs card fields; comments live in each course's own page.
     order = [name for name, _ in TOPICS] + [OTHER]
     counts = Counter(c["topic"] for c in courses)
     payload = {
-        "generated": int(time.time()), "dataEnd": now,
+        "generated": int(time.time()), "dataEnd": now, "comments": len(comments),
         "topics": [{"name": n, "count": counts[n]} for n in order if counts[n]],
-        "courses": courses, "comments": comments,
+        "courses": [{k: c[k] for k in GRID_FIELDS} for c in courses],
     }
-    OUT_JS.parent.mkdir(exist_ok=True)
-    OUT_JS.write_text("window.HACKER_COURSES = " + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + ";\n",
-                      encoding="utf-8")
-    print(f"{len(courses)} courses, {len(comments)} comments, {OUT_JS.stat().st_size / 1e6:.1f} MB")
+    COURSES_JS.write_text("window.HACKER_COURSES = " + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + ";\n",
+                          encoding="utf-8")
+    pages.write_all(courses, comments, now)
+    if OLD_DATA_JS.exists():
+        OLD_DATA_JS.unlink()
+    print(f"{len(courses)} courses, {len(comments)} comments; grid data {COURSES_JS.stat().st_size / 1e6:.2f} MB")
     for c in courses[:15]:
         print(f"{c['rank']:>3} {c['score']:6.2f} {c['recommenders']:>3}r {c['threads']:>3}t "
               f"{time.gmtime(c['first']).tm_year}-{time.gmtime(c['last']).tm_year} {c['badges']} {c['name']} | {c['provider']}")

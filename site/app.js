@@ -1,10 +1,10 @@
+// The course grid (home page). Course pages are separate, pre-rendered pages.
 (() => {
   "use strict";
 
-  const DATA = window.HACKER_COURSES || { topics: [], courses: [], comments: [] };
+  const DATA = window.HACKER_COURSES || { topics: [], courses: [], comments: 0 };
   const PAGE = 60;
   const ALL = "";
-  const STANCE = ["Criticizes", "Mentions", "Recommends", "Strongly recommends"];
   const BADGE = { classic: ["Classic", "classic"], evergreen: ["Evergreen", "evergreen"],
                   rising: ["Rising", "rising"], "hidden gem": ["Hidden gem", "gem"] };
   const VIEWS = [
@@ -23,31 +23,20 @@
   };
   const ERAS = { "": "Any era", "2000s": "First recommended 2006–09", "2010s": "First recommended 2010s",
                  "2020s": "First recommended 2020s" };
+  const FILTERS = ["topic", "level", "cost", "format", "era"];
 
   const $ = (id) => document.getElementById(id);
-  const grid = $("grid"), views = $("views"), filters = $("filters"), status = $("status"), more = $("more");
-  const q = $("q"), listView = $("listView"), courseView = $("courseView"), help = $("help"), about = $("about");
-  const byId = new Map(DATA.courses.map((c) => [c.id, c]));
+  const grid = $("grid"), views = $("views"), filters = $("filters"), status = $("status"), more = $("more"), q = $("q");
 
-  // ---- per-viewer storage (browser only; never required to render) ----------------
-
-  function load(key, fallback) {
-    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
-  }
-  function store(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode etc. */ }
-  }
-  const saved = new Set(load("hc.saved", []));
-  const seen = new Set(load("hc.seen", []));
-  const theme = load("hc.theme", null);
-  if (theme) document.documentElement.dataset.theme = theme;
+  let saved = HC.saved();
+  const seen = new Set(HC.load("hc.seen", []));
 
   // ---- helpers ----------------------------------------------------------------------
 
   const year = (t) => new Date(t * 1000).getUTCFullYear();
   const span = (c) => (year(c.first) === year(c.last) ? `${year(c.first)}` : `${year(c.first)}–${year(c.last)}`);
   const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? "" : "s"}`;
-  const threadUrl = (id) => `https://news.ycombinator.com/item?id=${id}`;
+  const courseUrl = (c) => `/course/${c.slug}/`;
   const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -64,12 +53,12 @@
   }
 
   const topicArt = (topic) =>
-    `img/topics/${topic.toLowerCase().replace("&", "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.svg`;
+    `/img/topics/${topic.toLowerCase().replace("&", "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.svg`;
 
   // The course's own preview image when it has one, else its topic illustration.
   // Remote images are hotlinked without a referrer and swap to the illustration if they fail.
-  function thumb(c, cls) {
-    const box = el("div", cls);
+  function thumb(c) {
+    const box = el("div", "thumb");
     const img = el("img");
     img.alt = "";
     img.loading = "lazy";
@@ -91,11 +80,22 @@
     return shown.map((b) => el("span", `badge ${BADGE[b][1]}`, BADGE[b][0]));
   }
 
-  // ---- list state ----------------------------------------------------------------------
+  // ---- state ------------------------------------------------------------------------
 
   const state = { view: "best", topic: ALL, level: ALL, cost: ALL, format: ALL, era: ALL, sort: "score",
                   query: "", terms: [], list: [], shown: 0, active: 0, cols: 1 };
   let cards = [];
+
+  // Remember the grid across course pages so Back/Esc returns to the same list and card,
+  // and course pages can step through this list with ← →.
+  function remember(activeSlug) {
+    HC.store("hc.grid", {
+      view: state.view, sort: state.sort, query: state.query,
+      ...Object.fromEntries(FILTERS.map((f) => [f, state[f]])),
+      slugs: state.list.map((c) => c.slug), names: state.list.map((c) => c.name),
+      active: activeSlug ?? state.list[state.active]?.slug,
+    }, "session");
+  }
 
   function renderViews() {
     views.replaceChildren();
@@ -163,13 +163,10 @@
       select("era", "Era", ERAS, state.era),
       select("sort", "Sort by", Object.fromEntries(Object.entries(SORTS).map(([k, [label]]) => [k, label])), state.sort),
     );
-    if (state.topic || state.level || state.cost || state.format || state.era) {
+    if (FILTERS.some((f) => state[f])) {
       const r = el("button", "btn reset", "Clear filters");
       r.type = "button";
-      r.addEventListener("click", () => {
-        Object.assign(state, { topic: ALL, level: ALL, cost: ALL, format: ALL, era: ALL });
-        renderFilters(); apply();
-      });
+      r.addEventListener("click", () => { FILTERS.forEach((f) => (state[f] = ALL)); renderFilters(); apply(); });
       filters.append(r);
     }
   }
@@ -202,8 +199,10 @@
     if (state.topic) bits.push(`in ${state.topic}`);
     if (state.terms.length) bits.push(`matching “${state.query}”`);
     status.textContent = `${bits.join(" ")} · sorted by ${SORTS[state.sort][0].toLowerCase()}.`;
-    syncHash();
+    remember();
   }
+
+  // ---- cards ------------------------------------------------------------------------
 
   function makeCard(c, index) {
     const card = el("div", "card");
@@ -216,7 +215,13 @@
     top.append(el("span", "rank", `#${c.rank}`), ...badgeEls(c));
     if (saved.has(c.id)) { const s = el("span", "saved-star", "★"); s.title = "Saved"; top.append(s); }
 
-    const h = highlight(el("h3"), c.name, state.terms);
+    // A real link (for crawlers, middle-click, copy link); the card itself handles keys.
+    const h = el("h3");
+    const a = el("a");
+    a.href = courseUrl(c);
+    a.tabIndex = -1;
+    highlight(a, c.name, state.terms);
+    h.append(a);
     const prov = el("p", "provider", [c.provider, c.level !== "unknown" && c.level, c.cost !== "unknown" && c.cost]
       .filter(Boolean).join(" · "));
     const why = highlight(el("p", "why"), c.why || c.summary, state.terms);
@@ -224,13 +229,18 @@
     meta.append(el("span", null, `${plural(c.recommenders, "recommender")} · ${plural(c.threads, "thread")} · ${span(c)}`),
                 el("span", null, c.topic));
 
-    card.append(thumb(c, "thumb"), top, h, prov, why, meta);
+    card.append(thumb(c), top, h, prov, why, meta);
     card.setAttribute("aria-label",
       `Rank ${c.rank}. ${c.name}, ${c.provider}. ${c.badges.map((b) => BADGE[b][0]).join(", ")}. ` +
       `${plural(c.recommenders, "recommender")}, ${span(c)}.${saved.has(c.id) ? " Saved." : ""}`);
-    card.addEventListener("click", () => { setActive(index); openCourse(c.id); });
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("a")) { remember(c.slug); return; }  // let the link (or middle-click) work
+      setActive(index); open(c);
+    });
     return card;
   }
+
+  function open(c) { remember(c.slug); location.href = courseUrl(c); }
 
   function showMore() {
     const end = Math.min(state.shown + PAGE, state.list.length);
@@ -293,12 +303,6 @@
     if (hadFocus) fresh.focus({ preventScroll: true });
   }
 
-  function toggleSave(id) {
-    if (saved.has(id)) saved.delete(id); else saved.add(id);
-    store("hc.saved", [...saved]);
-    renderViews();
-  }
-
   grid.addEventListener("keydown", (e) => {
     const card = e.target.closest(".card");
     if (!card || e.altKey || e.metaKey) return;
@@ -320,10 +324,13 @@
         break;
       case "PageDown": next = Math.min(i + cols * pageRows, state.list.length - 1); break;
       case "PageUp": next = Math.max(i - cols * pageRows, i % cols); break;
-      case "Enter": case " ": e.preventDefault(); openCourse(state.list[i].id); return;
+      case "Enter": case " ": e.preventDefault(); open(state.list[i]); return;
       case "s": case "S":
         if (e.ctrlKey) return;
-        e.preventDefault(); toggleSave(state.list[i].id);
+        e.preventDefault();
+        HC.toggleSaved(state.list[i].id);
+        saved = HC.saved();
+        renderViews();
         if (state.view === "saved") { apply(); focusCard(Math.min(i, state.list.length - 1)); } else refreshCard(i);
         return;
       default: return;
@@ -338,225 +345,29 @@
   let resizeTimer;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (!listView.hidden && columns() !== state.cols) layoutRows(); }, 120);
+    resizeTimer = setTimeout(() => { if (columns() !== state.cols) layoutRows(); }, 120);
   });
 
-  // ---- course page --------------------------------------------------------------------
-
-  function openCourse(id) { location.hash = `#/course/${id}`; }
-
-  function commentBody(text) {
-    const body = el("div");
-    text.split(/\n{2,}/).forEach((para) => {
-      const quoted = /^\s*>/.test(para);
-      body.append(el(quoted ? "blockquote" : "p", null, quoted ? para.replace(/^\s*>\s?/gm, "") : para));
-    });
-    return body;
-  }
-
-  function timeline(c) {
-    const start = 2006, end = year(DATA.dataEnd);
-    const counts = new Array(end - start + 1).fill(0);
-    c.endorsements.forEach(([ci, s]) => { if (s >= 2) counts[year(DATA.comments[ci].t) - start]++; });
-    const max = Math.max(...counts, 1);
-    const wrap = el("section", "timeline");
-    wrap.append(el("h2", null, "Recommendations by year"));
-    const bars = el("div", "bars");
-    bars.setAttribute("role", "img");
-    bars.setAttribute("aria-label", counts.map((n, i) => n && `${start + i}: ${n}`).filter(Boolean).join(", "));
-    counts.forEach((n, i) => {
-      const b = el("span", n ? null : "zero");
-      b.style.height = `${n ? Math.max(8, (n / max) * 100) : 3}%`;
-      b.title = `${start + i}: ${n}`;
-      bars.append(b);
-    });
-    const years = el("div", "years");
-    years.append(el("span", null, String(start)), el("span", null, String(end)));
-    wrap.append(bars, years);
-    return wrap;
-  }
-
-  function renderCourse(c) {
-    seen.add(c.id);
-    store("hc.seen", [...seen]);
-    const pos = state.list.findIndex((x) => x.id === c.id);
-    const prev = pos > 0 ? state.list[pos - 1] : null;
-    const next = pos >= 0 && pos < state.list.length - 1 ? state.list[pos + 1] : null;
-
-    const crumbs = el("nav", "crumbs");
-    crumbs.setAttribute("aria-label", "Course navigation");
-    const back = el("a", null, "← All courses"); back.href = "#/";
-    const pn = el("span");
-    if (prev) { const a = el("a", null, `← ${prev.name}`); a.href = `#/course/${prev.id}`; pn.append(a, " "); }
-    if (next) { const a = el("a", null, `${next.name} →`); a.href = `#/course/${next.id}`; pn.append(a); }
-    crumbs.append(back, pn);
-
-    const head = el("header", "course-head");
-    const tops = el("div", "card-top");
-    tops.append(el("span", "rank", `#${c.rank} overall`), ...badgeEls(c));
-    const h1 = el("h1", null, c.name); h1.id = "cName";
-    head.append(tops, h1, el("p", "provider", c.provider),
-      el("p", "statline", `${plural(c.recommenders, "recommender")} · ${plural(c.threads, "thread")} · ` +
-        `recommended in ${plural(c.years_active, "year")}, ${span(c)} · score ${c.score.toFixed(1)}`));
-
-    const actions = el("div", "actions");
-    if (c.url) {
-      const go = el("a", "btn primary", "Go to course ↗"); go.href = c.url; go.target = "_blank"; go.rel = "noopener nofollow";
-      actions.append(go);
-    } else {
-      const find = el("a", "btn primary", "Search for it ↗");
-      find.href = `https://duckduckgo.com/?q=${encodeURIComponent(`${c.name} ${c.provider}`)}`;
-      find.target = "_blank"; find.rel = "noopener nofollow";
-      actions.append(find);
-    }
-    const sv = el("button", "btn", saved.has(c.id) ? "★ Saved" : "☆ Save");
-    sv.type = "button";
-    sv.setAttribute("aria-pressed", String(saved.has(c.id)));
-    sv.addEventListener("click", () => {
-      toggleSave(c.id);
-      sv.textContent = saved.has(c.id) ? "★ Saved" : "☆ Save";
-      sv.setAttribute("aria-pressed", String(saved.has(c.id)));
-    });
-    actions.append(sv);
-
-    const facts = el("div", "facts");
-    [c.topic, c.level, c.cost, c.format].filter((f) => f && f !== "unknown")
-      .forEach((f) => facts.append(el("span", "chip", f)));
-    c.tags.forEach((t) => facts.append(el("span", "chip plain", `#${t}`)));
-
-    const list = el("ol", "comments");
-    c.endorsements.forEach(([ci, s]) => {
-      const cm = DATA.comments[ci];
-      const li = el("li", "comment");
-      const hd = el("header");
-      hd.append(el("span", `stance s${s}`, STANCE[s]), el("strong", null, cm.by), el("span", null, String(year(cm.t))));
-      if (cm.thread) hd.append(el("span", "thread", `in “${cm.thread}”`));
-      const body = commentBody(cm.text);
-      const ft = el("footer");
-      if (cm.text.length > 600) {
-        body.classList.add("clamped");
-        const more = el("button", "link-btn", "Read all");
-        more.type = "button";
-        more.addEventListener("click", () => { body.classList.remove("clamped"); more.remove(); });
-        ft.append(more);
-      }
-      const a = el("a", null, "Open comment ↗"); a.href = threadUrl(cm.id); a.target = "_blank"; a.rel = "noopener";
-      ft.append(a);
-      li.append(hd, body, ft);
-      list.append(li);
-    });
-
-    const rel = el("ul", "related");
-    c.related.map((id) => byId.get(id)).filter(Boolean).forEach((r) => {
-      const li = el("li"), a = el("a");
-      a.href = `#/course/${r.id}`;
-      a.append(el("strong", null, r.name), el("span", null, `${r.provider} · ${plural(r.recommenders, "recommender")}`));
-      li.append(a); rel.append(li);
-    });
-
-    const hero = el("figure", "hero");
-    hero.append(thumb(c, "hero-img"));
-    if (c.img && c.imgPage) {
-      const cap = el("figcaption");
-      const src = el("a", null, new URL(c.imgPage).hostname.replace(/^www\./, ""));
-      src.href = c.imgPage; src.target = "_blank"; src.rel = "noopener nofollow";
-      cap.append("Image: ", src);
-      hero.append(cap);
-    }
-
-    courseView.replaceChildren(crumbs, hero, head, actions,
-      el("p", "lede", c.summary), el("p", "why-long", c.why), facts, timeline(c),
-      el("h2", "section-h", `What commenters said (${c.endorsements.length})`), list);
-    if (rel.children.length) courseView.append(el("h2", "section-h", "Related courses"), rel);
-    document.title = `${c.name} · Hacker Courses`;
-  }
-
-  // ---- routing ------------------------------------------------------------------------
-
-  function syncHash() {
-    // Keep the list view's hash bare so Back from a course returns to the same list.
-    if (!location.hash.startsWith("#/course/") && location.hash !== "" && location.hash !== "#/") {
-      history.replaceState(null, "", "#/");
-    }
-  }
-
-  function route() {
-    const m = location.hash.match(/^#\/course\/(\d+)/);
-    const c = m && byId.get(Number(m[1]));
-    if (c) {
-      listView.hidden = true;
-      courseView.hidden = false;
-      renderCourse(c);
-      window.scrollTo(0, 0);
-      courseView.focus({ preventScroll: true });
-    } else {
-      const wasHidden = listView.hidden;
-      courseView.hidden = true;
-      listView.hidden = false;
-      document.title = "Hacker Courses";
-      if (wasHidden) {
-        // Returning from a course: mark it seen in place and restore focus.
-        const lastId = Number((sessionStorage.getItem("hc.last") || "-1"));
-        const i = state.list.findIndex((x) => x.id === lastId);
-        if (i >= 0) { refreshCard(i); focusCard(i); } else layoutRows();
-      }
-    }
-    if (c) try { sessionStorage.setItem("hc.last", String(c.id)); } catch { /* ignore */ }
-  }
-  window.addEventListener("hashchange", route);
-
-  courseView.addEventListener("keydown", (e) => {
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
-    if (e.target.closest("button, a, input, select") && (e.key === "Enter" || e.key === " ")) return;
-    const id = Number(location.hash.split("/")[2]);
-    const pos = state.list.findIndex((x) => x.id === id);
-    if (e.key === "Escape" || e.key === "Backspace") { e.preventDefault(); location.hash = "#/"; }
-    else if (e.key === "ArrowRight" && pos >= 0 && pos < state.list.length - 1) { e.preventDefault(); openCourse(state.list[pos + 1].id); state.active = pos + 1; }
-    else if (e.key === "ArrowLeft" && pos > 0) { e.preventDefault(); openCourse(state.list[pos - 1].id); state.active = pos - 1; }
-    else if (e.key === "o" || e.key === "O") { const go = courseView.querySelector(".btn.primary"); if (go) window.open(go.href, "_blank", "noopener"); }
-    else if (e.key === "s" || e.key === "S") { courseView.querySelector(".actions button")?.click(); }
-  });
-
-  // ---- global shortcuts ---------------------------------------------------------------
+  // ---- search & shortcuts -----------------------------------------------------------
 
   let qTimer;
   function flushQuery() {
     clearTimeout(qTimer);
     if (q.value.trim() !== state.query) { state.query = q.value.trim(); apply(); }
   }
+  q.form.addEventListener("submit", (e) => { e.preventDefault(); flushQuery(); focusCard(0); });
   q.addEventListener("input", () => { clearTimeout(qTimer); qTimer = setTimeout(flushQuery, 150); });
-  q.addEventListener("focus", () => { if (listView.hidden) location.hash = "#/"; });
   q.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); flushQuery(); focusCard(0); }
+    if (e.key === "ArrowDown") { e.preventDefault(); flushQuery(); focusCard(0); }
     if (e.key === "Escape") { q.value = ""; flushQuery(); focusCard(0); }
   });
 
-  function toggleTheme() {
-    const dark = document.documentElement.dataset.theme
-      ? document.documentElement.dataset.theme === "dark"
-      : matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.dataset.theme = dark ? "light" : "dark";
-    store("hc.theme", document.documentElement.dataset.theme);
-  }
-
-  $("themeBtn").addEventListener("click", toggleTheme);
-  $("helpBtn").addEventListener("click", () => help.showModal());
-  $("hClose").addEventListener("click", () => help.close());
-  $("aboutBtn").addEventListener("click", () => about.showModal());
-  $("aClose").addEventListener("click", () => about.close());
-  document.querySelector(".skip").addEventListener("click", (e) => {
-    e.preventDefault();
-    if (listView.hidden) courseView.focus(); else focusCard(state.active);
-  });
+  document.querySelector(".skip").addEventListener("click", (e) => { e.preventDefault(); focusCard(state.active); });
 
   document.addEventListener("keydown", (e) => {
-    if (help.open || about.open || e.ctrlKey || e.metaKey || e.altKey) return;
+    if ($("help").open || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.target.closest("input, select, textarea")) return;
-    if (e.key === "/") { e.preventDefault(); q.focus(); q.select(); }
-    else if (e.key === "?") { e.preventDefault(); help.showModal(); }
-    else if (e.key === "t" || e.key === "T") toggleTheme();
-    else if (listView.hidden) return;
-    else if (/^[1-5]$/.test(e.key)) { selectView(VIEWS[Number(e.key) - 1].id); focusCard(0); }
+    if (/^[1-5]$/.test(e.key)) { selectView(VIEWS[Number(e.key) - 1].id); focusCard(0); }
     else if (e.key === "]" || e.key === "[") {
       const names = ["", ...DATA.topics.map((t) => t.name)];
       const i = names.indexOf(state.topic);
@@ -565,13 +376,44 @@
     }
   });
 
-  // ---- boot -----------------------------------------------------------------------------
+  // Returning from a course page via Back restores the page from cache; re-sync saved/seen marks.
+  window.addEventListener("pageshow", (e) => {
+    if (!e.persisted) return;
+    saved = HC.saved();
+    HC.load("hc.seen", []).forEach((id) => seen.add(id));
+    renderViews();
+    cards.forEach((_, i) => refreshCard(i));
+    restoreFocus();
+  });
+
+  function restoreFocus() {
+    const back = HC.load("hc.grid", null, "session");
+    const i = back?.active ? state.list.findIndex((c) => c.slug === back.active) : -1;
+    if (i >= 0) focusCard(i);
+  }
+
+  // ---- boot -------------------------------------------------------------------------
 
   $("summary").textContent =
     `${DATA.courses.length.toLocaleString()} courses programmers keep recommending, ranked from ` +
-    `${DATA.comments.length.toLocaleString()} comments, 2006–${year(DATA.dataEnd)}.`;
+    `${DATA.comments.toLocaleString()} comments, 2006–${year(DATA.dataEnd)}.`;
+
+  const params = new URLSearchParams(location.search);
+  const back = HC.load("hc.grid", null, "session");
+  if (params.has("q")) {
+    state.query = params.get("q").trim();
+  } else if (back) {
+    // Coming back to the grid in the same tab: restore the list the visitor left.
+    Object.assign(state, { view: back.view || "best", sort: back.sort || "score", query: back.query || "" },
+      Object.fromEntries(FILTERS.map((f) => [f, back[f] || ALL])));
+  }
+  q.value = state.query;
   renderViews();
   renderFilters();
+  const activeSlug = back?.active;
   apply();
-  route();
+  if (activeSlug && !params.has("q")) {
+    const i = state.list.findIndex((c) => c.slug === activeSlug);
+    if (i >= 0) focusCard(i);
+  }
 })();

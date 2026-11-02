@@ -82,17 +82,31 @@ Properties are tested in `tests/test_rank.py`.
 
 ## Site
 
-`site/` is self-contained (`index.html`, `style.css`, `app.js`, `data.js`). Open `site/index.html`
-directly or serve it:
+`site/` is the whole deployable site, fully static and committed; `build.py` (via `pipeline/pages.py`)
+generates it:
+
+- `index.html` + `courses.js` (card data only, ~275 KB gzipped) + `app.js`: the grid
+- `course/<slug>/index.html`: one pre-rendered page per course (summary, by-year timeline, every comment
+  with its stance and thread, related courses, schema.org `Course` data, social preview tags) + `course.js`
+- `about/` (dedication, ranking method, removal requests), `404.html`, `sitemap.xml`, `robots.txt`
+- `_headers`: security headers (strict CSP: no inline scripts or styles) and image caching
+- `common.js`: theme, keyboard help and storage shared by every page
+
+Preview locally with the same headers and 404 handling Cloudflare Pages applies:
 
 ```bash
-uv run python -m http.server 8765 --directory site
+uv run python pipeline/serve.py 8765
 ```
 
 Views: Best, Trending, Hidden gems, Evergreen, Saved. Filters: topic, level, cost, format, era; five
-sort orders. Each course has its own page (`#/course/<id>`) with summary, a by-year timeline, every
-comment with its stance and thread, and related courses. Saved/seen courses and the theme are kept in
-`localStorage` only.
+sort orders. Saved/seen courses and the theme are kept in `localStorage` only; the grid's current list
+is kept in `sessionStorage` so course pages can step through it and Back returns to the same card.
+
+## Hosting
+
+Cloudflare Pages, connected to this repo: production branch `main`, framework preset *None*, build
+command empty, build output directory `site`. Every push to `main` deploys. The domain
+hackercourses.com is registered at Namecheap; its nameservers point to Cloudflare.
 
 Keys: arrows move, Home/End, Ctrl+Home/End, PgUp/PgDn, Enter opens, S saves, 1–5 views, `[` `]` topics,
 `/` search, T theme, `?` help; on a course page ← → previous/next course, O opens the course site,

@@ -5,6 +5,7 @@ requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.5.4",
     "pillow>=13.0.0",
+    "resvg-py>=0.5.0",
     "zstandard>=0.25.0",
 ]
 
