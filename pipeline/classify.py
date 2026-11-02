@@ -14,11 +14,14 @@ from multiprocessing import Pool
 from pathlib import Path
 from urllib.parse import urlparse
 
+import sources
+
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "data" / "candidates.jsonl"
-OUT_JSON = ROOT / "data" / "courses.json"
-POOL = ROOT / "data" / "pool.json"  # rule matches handed to review.py
-LABELS = ROOT / "data" / "llm_labels.jsonl"  # written by review.py
+_P = sources.paths("hn")
+SRC = _P.candidates
+OUT_JSON = _P.courses
+POOL = _P.pool  # rule matches handed to review.py
+LABELS = _P.labels  # written by review.py
 OUT_JS = ROOT / "site" / "data.js"
 
 # --- text cleanup -----------------------------------------------------------
