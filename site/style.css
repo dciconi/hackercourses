@@ -201,6 +201,10 @@ mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: in
 .bars .h4 { height: 40%; } .bars .h5 { height: 50%; } .bars .h6 { height: 60%; } .bars .h7 { height: 70%; }
 .bars .h8 { height: 80%; } .bars .h9 { height: 90%; } .bars .h10 { height: 100%; }
 .years { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+.bars-label { color: var(--muted); font-size: 12px; margin: 10px 0 4px; }
+.timeline .bars-label:first-of-type { margin-top: 0; }
+.rank-sep { color: var(--muted); }
+.prose .subs { padding-left: 20px; }
 
 .comments { list-style: none; padding: 0; margin: 0 0 30px; display: grid; gap: 12px; }
 .comment { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }

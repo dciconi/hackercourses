@@ -10,6 +10,7 @@ import re
 import time
 from html import escape
 
+import sources
 from classify import OTHER, ROOT, TOPICS
 
 SITE = ROOT / "site"
@@ -30,7 +31,23 @@ BADGE = {"classic": ("Classic", "classic"), "evergreen": ("Evergreen", "evergree
          "rising": ("Rising", "rising"), "hidden gem": ("Hidden gem", "gem")}
 TOPIC_PAGES = {"hn": [], "reddit": []}  # source -> [(topic, slug, course count)], filled by write_all() for the footer
 SOURCE_NAMES = {"hn": "Hacker News", "reddit": "Reddit"}
-REDDIT_COMMUNITIES = 30
+REDDIT_COMMUNITIES = len(sources.SUBREDDITS)  # write_all() sets the number actually present in the data
+REDDIT_SUBS = list(sources.SUBREDDITS)  # likewise: the configured subreddits that have comments
+SUBREDDIT_GROUPS = [
+    ("Business & entrepreneurship", ["Entrepreneur", "startups", "smallbusiness", "SaaS", "indiehackers",
+                                     "EntrepreneurRideAlong"]),
+    ("Software development", ["programming", "ExperiencedDevs", "webdev", "learnprogramming", "Python", "selfhosted"]),
+    ("AI & ML", ["MachineLearning", "LocalLLaMA", "artificial", "ChatGPT", "ClaudeAI", "learnmachinelearning"]),
+    ("Productivity", ["productivity", "getdisciplined", "Notion", "ObsidianMD", "PKMS", "bujo"]),
+    ("Marketing & growth", ["marketing", "PPC", "SEO", "bigseo", "socialmedia", "Emailmarketing"]),
+]
+# The only Reddit data in use: a per-subreddit dump of Reddit's own comments, 2005-06 to 2023-12.
+REDDIT_DUMP = "https://academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10"
+REDDIT_TERMS = "https://www.redditinc.com/policies/user-agreement"
+HN_CREDITS = (("nixiesearch/hackernews-comments", "https://huggingface.co/datasets/nixiesearch/hackernews-comments",
+               "Apache-2.0"),
+              ("open-index/hacker-news", "https://huggingface.co/datasets/open-index/hacker-news", "ODC-By"),
+              ("HN Search API", "https://hn.algolia.com/api", None))
 
 
 def home(source):
@@ -181,25 +198,28 @@ HELP = """<dialog id="help" aria-labelledby="hTitle">
 </dialog>"""
 
 
+def reddit_present():
+    return bool(TOPIC_PAGES["reddit"])
+
+
 def footer(source="hn"):
-    if source == "reddit":
-        return f"""<footer class="foot">
-  Built from public Reddit comments in {REDDIT_COMMUNITIES} communities, via a public archive of Reddit comment dumps.
-  Each comment belongs to its author and links back to Reddit; course images belong to the course providers.
-  Want a comment removed? <a href="{REPO}/issues/new?template=removal.yml">Open a removal request</a>.
-  <a href="/about/">About</a> · <a href="{REPO}">Source</a>.
-  Not affiliated with Reddit.
-  {topic_nav(source)}
-</footer>"""
-    return f"""<footer class="foot">
-  Built from public Hacker News comments, {SPAN}, via the
+    credit = f"""Built from public Hacker News comments, {SPAN}, via the
   <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> (Apache-2.0) and
   <a href="https://huggingface.co/datasets/open-index/hacker-news">open-index/hacker-news</a> (ODC-By) datasets and the
-  <a href="https://hn.algolia.com/api">HN Search API</a>.
+  <a href="https://hn.algolia.com/api">HN Search API</a>."""
+    unaffiliated = "Not affiliated with Y Combinator or Hacker News."
+    if reddit_present() or source == "reddit":
+        credit += f"""
+  Reddit comments come from the <a href="{REDDIT_DUMP}">per-subreddit Reddit dump by Watchful1</a> on Academic
+  Torrents (2005 to 2023, no license published; the comments belong to their authors under
+  <a href="{REDDIT_TERMS}">Reddit's User Agreement</a>)."""
+        unaffiliated = "Not affiliated with Y Combinator, Hacker News or Reddit."
+    return f"""<footer class="foot">
+  {credit}
   Each comment belongs to its author; course images belong to the course providers.
   Want a comment removed? <a href="{REPO}/issues/new?template=removal.yml">Open a removal request</a>.
   <a href="/about/">About</a> · <a href="{REPO}">Source</a>.
-  Not affiliated with Y Combinator or Hacker News.
+  {unaffiliated}
   {topic_nav(source)}
 </footer>"""
 
@@ -355,31 +375,73 @@ def comment_body(text):
     return "".join(out)
 
 
+def present(c):
+    """The sources this course is recommended on, in display order."""
+    return [src for src in SOURCE_NAMES if src in c["sources"]]
+
+
 def timeline(c, comments, data_end):
-    start, stop = 2006, year(data_end)
-    counts = [0] * (stop - start + 1)
-    for ci, s in c["endorsements"]:
-        if s >= 2:
-            counts[year(comments[ci]["t"]) - start] += 1
-    peak = max(counts) or 1
-    bars = "".join(
-        f'<span class="h{round(n / peak * 10) if n else 0}{"" if n else " zero"}" title="{start + i}: {n}"></span>'
-        for i, n in enumerate(counts))
-    label = ", ".join(f"{start + i}: {n}" for i, n in enumerate(counts) if n)
-    return (f'<section class="timeline"><h2>Recommendations by year</h2>'
-            f'<div class="bars" role="img" aria-label="{e(label)}">{bars}</div>'
+    vs = {src: view(c, src) for src in present(c)}
+    # HN-only courses keep the 2006-to-today axis; a Reddit-only course shows just its own years.
+    start = min([2006] * ("hn" in vs) + [year(v["first"]) for v in vs.values()])
+    stop = max([year(data_end)] * ("hn" in vs) + [year(v["last"]) for v in vs.values()])
+    rows = ""
+    for src, v in vs.items():
+        counts = [0] * (stop - start + 1)
+        for ci, s in v["endorsements"]:
+            if s >= 2:
+                counts[year(comments[ci]["t"]) - start] += 1
+        peak = max(counts) or 1
+        bars = "".join(
+            f'<span class="h{round(n / peak * 10) if n else 0}{"" if n else " zero"}" title="{start + i}: {n}"></span>'
+            for i, n in enumerate(counts))
+        label = ", ".join(f"{start + i}: {n}" for i, n in enumerate(counts) if n)
+        if len(vs) > 1:
+            label = f"{SOURCE_NAMES[src]}. {label}"
+            rows += f'<p class="bars-label">{SOURCE_NAMES[src]}</p>'
+        rows += f'<div class="bars" role="img" aria-label="{e(label)}">{bars}</div>'
+    return (f'<section class="timeline"><h2>Recommendations by year</h2>{rows}'
             f'<div class="years"><span>{start}</span><span>{stop}</span></div></section>')
 
 
-def course_page(c, comments, by_id, data_end):
+READ_ALL = '<button class="link-btn read-more" type="button">Read all</button>'
+
+
+def comment_item(cm, s, src):
+    thread = f'<span class="thread">in “{e(cm["thread"])}”</span>' if cm["thread"] else ""
+    if src == "reddit":
+        sub = f'<span>r/{e(cm["sub"])}</span>' if cm.get("sub") else ""
+        ups = f'<span class="ups">▲ {cm["ups"]:,}</span>' if cm.get("ups") is not None else ""
+        return (f'<li class="comment"><header><span class="stance s{s}">{STANCE[s]}</span><strong>{e(cm["by"])}</strong>'
+                f'{sub}<span>{year(cm["t"])}</span>{thread}{ups}</header>'
+                f'<div>{comment_body(cm["text"])}</div>'
+                f'<footer><a href="{e(cm["url"])}" target="_blank" rel="noopener">Open on Reddit ↗</a></footer></li>')
+    long = len(cm["text"]) > 600
+    return (
+        f'<li class="comment"><header><span class="stance s{s}">{STANCE[s]}</span><strong>{e(cm["by"])}</strong>'
+        f'<span>{year(cm["t"])}</span>{thread}</header>'
+        f'<div class="{"clamped" if long else ""}">{comment_body(cm["text"])}</div>'
+        f'<footer>{READ_ALL if long else ""}'
+        f'<a href="https://news.ycombinator.com/item?id={cm["id"]}" target="_blank" rel="noopener">Open comment ↗</a></footer></li>')
+
+
+def course_page(c, comments, by_id, data_end, multi=False):
+    """c: a merged course (shared fields plus sources). multi: the site has Reddit pages, so rank
+    labels name their source ("#3 on Hacker News") instead of "overall"."""
+    vs = {src: view(c, src) for src in present(c)}
+    lead = next(iter(vs))
+    first, last = min(x["first"] for x in vs.values()), max(x["last"] for x in vs.values())
     img = c["img"] or f"{BASE}/img/og/{topic_slug(c['topic'])}.png"
-    years = span(c)
+    years = span({"first": first, "last": last})
     url, tslug = f"{BASE}/course/{c['slug']}/", topic_slug(c["topic"])
+    who = " and ".join(plural(vs[src]["recommenders"], word) for src, word in
+                       (("hn", "Hacker News commenter"), ("reddit", "Redditor")) if src in vs)
     # Lead with the facts a searcher (or a model quoting the page) needs: who, how many, since when.
-    desc = clip(f"{c['name']} ({c['provider']}): recommended by {plural(c['recommenders'], 'Hacker News commenter')}, "
-                f"{years}. {c['why'] or c['summary']}", 300)
+    desc = clip(f"{c['name']} ({c['provider']}): recommended by {who}, {years}. {c['why'] or c['summary']}", 300)
     with_provider = c["provider"] and c["provider"].lower() not in c["name"].lower()
-    title = f"{c['name']}{f' ({c['provider']})' if with_provider else ''} · Hacker News recommendations"
+    suffix = {("hn",): "Hacker News recommendations", ("reddit",): "Reddit recommendations"}.get(
+        tuple(vs), "recommended on Hacker News and Reddit")
+    title = f"{c['name']}{f' ({c['provider']})' if with_provider else ''} · {suffix}"
     course = {"@type": "Course", "@id": f"{url}#course", "name": c["name"],
               "description": c["summary"] or c["why"] or desc, "url": url, "image": img, "about": c["topic"],
               "provider": {"@type": "Organization", "name": c["provider"]}}
@@ -391,15 +453,15 @@ def course_page(c, comments, by_id, data_end):
         course["isAccessibleForFree"] = c["cost"] == "free"
     if c["tags"]:
         course["keywords"] = ", ".join(c["tags"])
-    modified = max(comments[ci]["t"] for ci, _ in c["endorsements"])
+    modified = max(comments[ci]["t"] for x in vs.values() for ci, _ in x["endorsements"])
     ld = {"@context": "https://schema.org", "@graph": [
         course,
         {"@type": "WebPage", "@id": url, "url": url, "name": title, "description": desc,
          "isPartOf": {"@id": f"{BASE}/#website"}, "about": {"@id": f"{url}#course"},
-         "datePublished": iso(c["first"]), "dateModified": iso(modified)},
+         "datePublished": iso(first), "dateModified": iso(modified)},
         {"@type": "BreadcrumbList", "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": NAME, "item": f"{BASE}/"},
-            {"@type": "ListItem", "position": 2, "name": c["topic"], "item": f"{BASE}/topic/{tslug}/"},
+            {"@type": "ListItem", "position": 1, "name": NAME, "item": f"{BASE}{home(lead)}"},
+            {"@type": "ListItem", "position": 2, "name": c["topic"], "item": f"{BASE}{topic_url(lead, tslug)}"},
             {"@type": "ListItem", "position": 3, "name": c["name"], "item": url}]}]}
     extra = json_ld(ld)
 
@@ -413,26 +475,31 @@ def course_page(c, comments, by_id, data_end):
           if c["url"] else
           f'<a class="btn primary" id="goBtn" href="https://duckduckgo.com/?q={e(c["name"] + " " + c["provider"])}" '
           f'target="_blank" rel="noopener nofollow">Search for it ↗</a>')
-    facts = f'<a class="chip" href="/topic/{tslug}/">{e(c["topic"])}</a>'
+    facts = f'<a class="chip" href="{topic_url(lead, tslug)}">{e(c["topic"])}</a>'
     facts += "".join(f'<span class="chip">{e(f)}</span>' for f in (c["level"], c["cost"], c["format"])
                      if f and f != "unknown")
     facts += "".join(f'<span class="chip plain">#{e(t)}</span>' for t in c["tags"])
 
-    items = []
-    for ci, s in c["endorsements"]:
-        cm = comments[ci]
-        thread = f'<span class="thread">in “{e(cm["thread"])}”</span>' if cm["thread"] else ""
-        long = len(cm["text"]) > 600
-        items.append(
-            f'<li class="comment"><header><span class="stance s{s}">{STANCE[s]}</span><strong>{e(cm["by"])}</strong>'
-            f'<span>{year(cm["t"])}</span>{thread}</header>'
-            f'<div class="{"clamped" if long else ""}">{comment_body(cm["text"])}</div>'
-            f'<footer>{"<button class=\"link-btn read-more\" type=\"button\">Read all</button>" if long else ""}'
-            f'<a href="https://news.ycombinator.com/item?id={cm["id"]}" target="_blank" rel="noopener">Open comment ↗</a></footer></li>')
+    ranks = []
+    for src, x in vs.items():
+        where = "overall" if not multi and src == "hn" else f"on {SOURCE_NAMES[src]}"
+        ranks.append(f'<span class="rank">#{x["rank"]} {where}</span>{badges_html(x)}')
+    rank_line = '<span class="rank-sep" aria-hidden="true">·</span>'.join(ranks)
+    statlines = "\n    ".join(
+        f'<p class="statline">{SOURCE_NAMES[src] + ": " if len(vs) > 1 else ""}{plural(x["recommenders"], "recommender")} · '
+        f'{plural(x["threads"], "thread")} · recommended in {plural(x["years_active"], "year")}, {span(x)} · '
+        f'score {x["score"]:.1f}</p>' for src, x in vs.items())
+
+    sections = []
+    for src, x in vs.items():
+        heading = "What commenters said" if tuple(vs) == ("hn",) else f"On {SOURCE_NAMES[src]}"
+        items = "".join(comment_item(comments[ci], s, src) for ci, s in x["endorsements"])
+        sections.append(f'<h2 class="section-h">{heading} ({len(x["endorsements"])})</h2>\n'
+                        f'  <ol class="comments">{items}</ol>')
 
     related = "".join(
         f'<li><a href="/course/{r["slug"]}/"><strong>{e(r["name"])}</strong>'
-        f'<span>{e(r["provider"])} · {plural(r["recommenders"], "recommender")}</span></a></li>'
+        f'<span>{e(r["provider"])} · {plural(view(r, present(r)[0])["recommenders"], "recommender")}</span></a></li>'
         for r in (by_id[i] for i in c["related"] if i in by_id))
 
     prev_next = ""
@@ -442,33 +509,63 @@ def course_page(c, comments, by_id, data_end):
         prev_next += f'<a id="nextLink" href="/course/{c["next"]["slug"]}/">{e(c["next"]["name"])} →</a>'
 
     return (head(title, desc, f"/course/{c['slug']}/", img, "article", extra)
-            + header()
+            + header(source=lead)
             + f"""
 <main id="main" class="course-page" tabindex="-1" data-id="{c['id']}" data-slug="{c['slug']}">
-  <nav class="crumbs" aria-label="Course navigation"><a href="/" id="backLink">← All courses</a><span id="prevNext">{prev_next}</span></nav>
+  <nav class="crumbs" aria-label="Course navigation"><a href="{home(lead)}" id="backLink">← All courses</a><span id="prevNext">{prev_next}</span></nav>
   <figure class="hero"><div class="{hero_cls}"><img src="{e(hero_src)}" alt="{e(c['name']) if c['img'] else ''}" referrerpolicy="no-referrer" data-fallback="/img/topics/{topic_slug(c['topic'])}.svg"></div>{caption}</figure>
   <header class="course-head">
-    <div class="card-top"><span class="rank">#{c['rank']} overall</span>{badges_html(c)}</div>
+    <div class="card-top">{rank_line}</div>
     <h1 id="cName">{e(c['name'])}</h1>
     <p class="provider">{e(c['provider'])}</p>
-    <p class="statline">{plural(c['recommenders'], 'recommender')} · {plural(c['threads'], 'thread')} · recommended in {plural(c['years_active'], 'year')}, {years} · score {c['score']:.1f}</p>
+    {statlines}
   </header>
   <div class="actions">{go}<button class="btn" id="saveBtn" type="button" aria-pressed="false">☆ Save</button></div>
   <p class="lede">{e(c['summary'])}</p>
   <p class="why-long">{e(c['why'])}</p>
   <div class="facts">{facts}</div>
   {timeline(c, comments, data_end)}
-  <h2 class="section-h">What commenters said ({len(c['endorsements'])})</h2>
-  <ol class="comments">{''.join(items)}</ol>
+  {"".join(sections)}
   {'<h2 class="section-h">Related courses</h2><ul class="related">' + related + '</ul>' if related else ''}
 </main>
 """
-            + end(["/course.js"]))
+            + end(["/course.js"], lead))
+
+
+def reddit_about(meta):
+    """The About section for the Reddit list; only the subreddits that are in the data."""
+    present = set(meta.get("reddit_subs", ()))
+    groups = "".join(
+        f"<li><strong>{e(name)}.</strong> " + ", ".join(f"r/{e(sub)}" for sub in subs if sub in present) + "</li>"
+        for name, subs in SUBREDDIT_GROUPS if present.intersection(subs))
+    y0, y1 = meta.get("reddit_years", (2023, 2023))
+    years = str(y0) if y0 == y1 else f"{y0} to {y1}"
+    return f"""
+  <h2 id="reddit">Reddit</h2>
+  <p>The Reddit list is built the same way from {meta.get('reddit_comments', 0):,} public comments in
+  {len(present)} subreddits, {years}, and ranked on its own. The two rankings are never mixed or normalized, so a
+  rank on one says nothing about the other. A course needs at least two different recommenders to be listed
+  from Reddit alone.</p>
+  <ul class="subs">{groups}</ul>
+  <p><strong>Upvotes.</strong> On Reddit a comment's votes also count. An upvoted comment counts up to twice
+  (the more upvotes, the closer to twice), a comment with no net upvotes counts half, and comments captured
+  less than 30 days after they were posted count without their votes, since they had no time to collect any.</p>
+  <p><strong>Excerpts.</strong> Reddit comments are shown as short excerpts of at most 300 characters, each
+  linking to the full comment on Reddit.</p>
+  <p><strong>Data.</strong> The comments come from the
+  <a href="{REDDIT_DUMP}" rel="noopener">per-subreddit Reddit dump by Watchful1</a> on Academic Torrents
+  ("Subreddit comments/submissions 2005-06 to 2023-12", top 40k subreddits), so the Reddit list ends in
+  December 2023. No license or terms were published with that dump. The comments belong to their authors
+  and remain subject to <a href="{REDDIT_TERMS}" rel="noopener">Reddit's User Agreement</a>.
+  {NAME} is not affiliated with Reddit.</p>
+"""
 
 
 def about_page(meta):
+    reddit = meta.get("reddit")
     desc = (f"How {NAME} finds, ranks and credits the {meta['courses']:,} online courses programmers recommend "
-            f"in {meta['comments']:,} public Hacker News comments, {SPAN}.")
+            f"in {meta['comments']:,} public Hacker News comments, {SPAN}"
+            + (" and in public Reddit comments." if reddit else "."))
     # The generated catalog is CC BY 4.0, so describe it as a dataset (Google Dataset Search, citations).
     ld = {"@context": "https://schema.org", "@graph": [
         {"@type": "AboutPage", "@id": f"{BASE}/about/", "url": f"{BASE}/about/", "name": f"About {NAME}",
@@ -483,6 +580,13 @@ def about_page(meta):
          "creator": {"@type": "Organization", "name": NAME, "url": f"{BASE}/"},
          "distribution": [{"@type": "DataDownload", "encodingFormat": "text/plain",
                            "contentUrl": f"{BASE}/llms-full.txt"}]}]}
+    if reddit:
+        ld["@graph"][1]["isBasedOn"] = (
+            [{"@type": "Dataset", "name": name, "url": link} for name, link, _ in HN_CREDITS]
+            + [{"@type": "Dataset", "name": "Subreddit comments/submissions 2005-06 to 2023-12 (Watchful1)",
+                "url": REDDIT_DUMP}])
+    reddit_section = reddit_about(meta) if reddit else ""
+    reddit_note = ' Reddit has its own list; see <a href="#reddit">Reddit</a> below.' if reddit else ""
     return (head(f"About · {NAME}", desc, "/about/", f"{BASE}/img/og/site.png", extra=json_ld(ld))
             + header()
             + f"""
@@ -496,7 +600,7 @@ def about_page(meta):
   </aside>
 
   <p>{NAME} collects the online courses programmers recommend to each other in public Hacker News comments,
-  from {SPAN}: {meta['courses']:,} courses drawn from {meta['comments']:,} comments.</p>
+  from {SPAN}: {meta['courses']:,} courses drawn from {meta['comments']:,} comments.{reddit_note}</p>
 
   <h2>How ranking works</h2>
   <p>Comment karma is not public, so each course is scored from who recommended it, how strongly, in how many
@@ -527,7 +631,7 @@ def about_page(meta):
   which also merged the many spellings of each course, labelled each comment's stance and wrote the summaries.
   Expect a few misses. Course images come from each course's own page; courses without one get an illustration
   for their topic. The full pipeline is <a href="{REPO}">open source</a>.</p>
-
+{reddit_section}
   <h2>License</h2>
   <p>The code and original artwork are <a href="{REPO}/blob/main/LICENSE">MIT licensed</a>. The course catalog,
   rankings and summaries this project generated are
@@ -582,42 +686,75 @@ def course_line(c):
             f"{plural(c['recommenders'], 'recommender')}, {span(c)}. {clip(c['summary'] or c['why'], 220)}")
 
 
-def llms_txt(courses, meta, by_topic):
+def llms_sources():
+    return ["## Sources", "",
+            "- Hacker News comments: "
+            + "; ".join(f"[{n}]({u})" + (f" ({lic})" if lic else "") for n, u, lic in HN_CREDITS) + ".",
+            f"- Reddit comments: the [per-subreddit Reddit dump by Watchful1]({REDDIT_DUMP}) on Academic Torrents "
+            "(\"Subreddit comments/submissions 2005-06 to 2023-12\"). No license or terms were published with it; "
+            f"the comments belong to their authors under [Reddit's User Agreement]({REDDIT_TERMS}). "
+            "Reddit comments are shown as excerpts of at most 300 characters, linked to the original.", ""]
+
+
+def llms_txt(courses, meta, by_topic, reddit=None):
+    """courses/by_topic: the Hacker News ranking. reddit: the Reddit ranking (views), when there is one."""
+    reddit = reddit or []
+    affiliation = ("Not affiliated with Y Combinator, Hacker News or Reddit." if reddit
+                   else "Not affiliated with Y Combinator or Hacker News.")
     out = [f"# {NAME}", "",
            f"> The online courses programmers keep recommending, ranked from {meta['comments']:,} public Hacker News "
            f"comments, {SPAN}: {meta['courses']:,} courses with a page each.", "",
            "Each course is scored from who recommended it, how strongly, in how many separate threads and for how "
            "many years (one vote per person; replies piling onto one thread are damped). Every course page quotes "
            "the comments behind its ranking and links each one to Hacker News. The catalog, rankings and summaries "
-           "are CC BY 4.0; please cite and link the course page. Not affiliated with Y Combinator or Hacker News.", "",
-           "## Courses by topic", ""]
+           f"are CC BY 4.0; please cite and link the course page. {affiliation}", ""]
+    if reddit:
+        out += [f"Reddit has its own ranking, built the same way from {meta.get('reddit_comments', 0):,} public Reddit "
+                f"comments. The Hacker News and Reddit rankings are never mixed. {BASE}/reddit/ is the Reddit list.", ""]
+    out += ["## Courses by topic", ""]
     for t, s, n in TOPIC_PAGES["hn"]:
         out.append(f"- [{t}]({BASE}/topic/{s}/): {n} courses. Top: "
                    + ", ".join(c["name"] for c in by_topic[t][:5]))
-    out += ["", "## Top 30 overall", ""] + [course_line(c) for c in courses[:30]]
+    out += ["", "## Top 30 overall" if not reddit else "## Top 30 on Hacker News", ""] + [course_line(c) for c in courses[:30]]
+    if reddit:
+        out += ["", "## Top 30 on Reddit", ""] + [course_line(c) for c in reddit[:30]]
     out += ["", "## Optional", "",
             f"- [Every course, one record each]({BASE}/llms-full.txt): rank, links, topic, level, cost, format, "
             "years and summaries for all courses",
             f"- [About and ranking method]({BASE}/about/)",
             f"- [Source code and pipeline]({REPO})", ""]
+    if reddit:
+        out += llms_sources()
     return "\n".join(out)
 
 
 def llms_full_txt(courses, meta):
+    """courses: merged courses in listing order (Hacker News rank first, then Reddit-only courses)."""
+    reddit = bool(meta.get("reddit"))
+    both = f" and {meta.get('reddit_comments', 0):,} public Reddit comments" if reddit else ""
     out = [f"# {NAME}: every course", "",
-           f"> {meta['courses']:,} online courses recommended in {meta['comments']:,} public Hacker News comments, "
-           f"{SPAN}, in rank order. CC BY 4.0: cite {BASE}/ and link the course page.", ""]
+           f"> {meta['courses']:,} online courses recommended in {meta['comments']:,} public Hacker News comments"
+           f"{both}, {SPAN}, in rank order. CC BY 4.0: cite {BASE}/ and link the course page."
+           + (" Ranks are per source and never mixed." if reddit else ""), ""]
     for c in courses:
+        vs = {src: view(c, src) for src in present(c)}
         facts = "; ".join(f"{k}: {v}" for k, v in (("Topic", c["topic"]), ("Level", c["level"]), ("Cost", c["cost"]),
                                                    ("Format", c["format"])) if v and v != "unknown")
-        badges = ", ".join(BADGE[b][0] for b in c["badges"])
-        out += [f"## #{c['rank']} {c['name']} ({c['provider']})", "",
-                f"Page: {BASE}/course/{c['slug']}/"]
+        if reddit:
+            out += [f"## {c['name']} ({c['provider']})", "",
+                    "Rank: " + " · ".join(f"#{v['rank']} on {SOURCE_NAMES[src]}" for src, v in vs.items())]
+            out.append(f"Page: {BASE}/course/{c['slug']}/")
+        else:
+            v = vs["hn"]
+            out += [f"## #{v['rank']} {c['name']} ({c['provider']})", "", f"Page: {BASE}/course/{c['slug']}/"]
         if c["url"]:
             out.append(f"Course website: {c['url']}")
-        out += [facts,
-                f"Recommended by {c['recommenders']:,} {'person' if c['recommenders'] == 1 else 'people'} in {plural(c['threads'], 'thread')}, "
-                f"{span(c)}." + (f" Badges: {badges}." if badges else "")]
+        out.append(facts)
+        for src, v in vs.items():
+            badges = ", ".join(BADGE[b][0] for b in v["badges"])
+            where = f" on {SOURCE_NAMES[src]}" if reddit else ""
+            out.append(f"Recommended{where} by {v['recommenders']:,} {'person' if v['recommenders'] == 1 else 'people'} "
+                       f"in {plural(v['threads'], 'thread')}, {span(v)}." + (f" Badges: {badges}." if badges else ""))
         if c["tags"]:
             out.append("Tags: " + ", ".join(c["tags"]))
         out += [""] + [p for p in (c["summary"], c["why"] and f"Why people recommend it: {c['why']}") if p] + [""]
@@ -631,21 +768,48 @@ def view(c, source):
     return {k: v for k, v in c.items() if k != "sources"} | c["sources"][source]
 
 
+def remove_reddit_pages(root):
+    """Drop the Reddit pages left from an earlier build that had Reddit data."""
+    for old in (root / "topic").glob("*/index.html"):
+        old.unlink()
+    (root / "index.html").unlink(missing_ok=True)
+    for d in sorted(root.rglob("*"), reverse=True) if root.exists() else ():
+        if d.is_dir():
+            try:
+                d.rmdir()
+            except OSError:
+                pass
+    try:
+        root.rmdir()
+    except OSError:
+        pass
+
+
 def write_all(courses, comments, data_end):
     """courses: build.py's merged courses (shared fields, slug, related, sources).
 
-    Renders each source's pages from that source's views. Course pages are still HN-only. The
-    switch and the Reddit pages exist only when some course was recommended on Reddit."""
-    ranked = {src: sorted((view(c, src) for c in courses if src in c["sources"]), key=lambda c: c["rank"])
+    Every course gets a page (Hacker News ones, then Reddit-only ones). Each source's grid and topic
+    pages are rendered from that source's views. The switch and the Reddit pages exist only when some
+    course was recommended on Reddit."""
+    global REDDIT_COMMUNITIES, REDDIT_SUBS
+    merged = {src: sorted((c for c in courses if src in c["sources"]), key=lambda c: c["sources"][src]["rank"])
               for src in SOURCE_NAMES}
-    courses = ranked["hn"]
+    ranked = {src: [view(c, src) for c in cs] for src, cs in merged.items()}
     has_reddit = bool(ranked["reddit"])
-    comments_in = {src: sum(1 for cm in comments if cm.get("src", "hn") == src) for src in SOURCE_NAMES}
+    listing = merged["hn"] + [c for c in merged["reddit"] if "hn" not in c["sources"]]
+    reddit_comments = [cm for cm in comments if cm.get("src", "hn") == "reddit"]
+    comments_in = {"hn": len(comments) - len(reddit_comments), "reddit": len(reddit_comments)}
+    if has_reddit:
+        seen = {cm["sub"] for cm in reddit_comments if cm.get("sub")}
+        REDDIT_SUBS = [s for s in sources.SUBREDDITS if s in seen]
+        REDDIT_COMMUNITIES = len(REDDIT_SUBS)
     configure(data_end)
-    by_id = {c["id"]: c for c in courses}
-    for i, c in enumerate(courses):
-        c["prev"] = courses[i - 1] if i > 0 else None
-        c["next"] = courses[i + 1] if i + 1 < len(courses) else None
+    by_id = {c["id"]: c for c in listing}
+    for src in SOURCE_NAMES:
+        for i, c in enumerate(merged[src]):
+            if present(c)[0] == src:  # baked prev/next follow the course's first source
+                c["prev"] = merged[src][i - 1] if i > 0 else None
+                c["next"] = merged[src][i + 1] if i + 1 < len(merged[src]) else None
     by_topic = {src: {} for src in SOURCE_NAMES}
     for src, cs in ranked.items():
         for c in cs:
@@ -657,22 +821,27 @@ def write_all(courses, comments, data_end):
                    "topics": {s: {slug for _, slug, _ in TOPIC_PAGES[s]} for s in SOURCE_NAMES}}
              for src in SOURCE_NAMES}
     meta = metas["hn"]
+    if has_reddit:
+        years = [year(cm["t"]) for cm in reddit_comments]
+        meta |= {"reddit_comments": comments_in["reddit"], "reddit_subs": REDDIT_SUBS,
+                 "reddit_years": (min(years), max(years))}
 
     for old in (SITE / "course").glob("*/index.html"):
         old.unlink()
-    for c in courses:
+    for c in listing:
         d = SITE / "course" / c["slug"]
         d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(course_page(c, comments, by_id, data_end), encoding="utf-8")
-    for c in courses:
+        (d / "index.html").write_text(course_page(c, comments, by_id, data_end, multi=has_reddit), encoding="utf-8")
+    for c in listing:
         c.pop("prev", None), c.pop("next", None)
 
     for src in SOURCE_NAMES:
         root = SITE / "reddit" if src == "reddit" else SITE
+        if src == "reddit" and not has_reddit:
+            remove_reddit_pages(root)
+            continue
         for old in (root / "topic").glob("*/index.html"):
             old.unlink()
-        if src == "reddit" and not has_reddit:
-            continue
         for t, s, _ in TOPIC_PAGES[src]:
             d = root / "topic" / s
             d.mkdir(parents=True, exist_ok=True)
@@ -685,18 +854,21 @@ def write_all(courses, comments, data_end):
     (SITE / "404.html").write_text(not_found_page(), encoding="utf-8")
     (SITE / "_headers").write_text(HEADERS, encoding="utf-8")
     (SITE / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {BASE}/sitemap.xml\n", encoding="utf-8")
-    (SITE / "llms.txt").write_text(llms_txt(courses, meta, by_topic["hn"]), encoding="utf-8")
-    (SITE / "llms-full.txt").write_text(llms_full_txt(courses, meta), encoding="utf-8")
+    (SITE / "llms.txt").write_text(llms_txt(ranked["hn"], meta, by_topic["hn"], ranked["reddit"]), encoding="utf-8")
+    (SITE / "llms-full.txt").write_text(llms_full_txt(listing, meta), encoding="utf-8")
 
     # lastmod is the newest comment behind each page, so crawlers can trust it and skip unchanged pages.
     def newest(cs):
-        return iso(max(comments[ci]["t"] for c in cs for ci, _ in c["endorsements"]))
+        return iso(max(comments[ci]["t"] for c in cs for x in c["sources"].values() for ci, _ in x["endorsements"]))
+
+    def newest_in(vs):
+        return iso(max(comments[ci]["t"] for v in vs for ci, _ in v["endorsements"]))
     urls = [("/", iso(data_end)), ("/about/", iso(data_end))]
-    urls += [(f"/topic/{s}/", newest(by_topic["hn"][t])) for t, s, _ in TOPIC_PAGES["hn"]]
+    urls += [(f"/topic/{s}/", newest_in(by_topic["hn"][t])) for t, s, _ in TOPIC_PAGES["hn"]]
     if has_reddit:
         urls.append(("/reddit/", iso(data_end)))
-        urls += [(topic_url("reddit", s), newest(by_topic["reddit"][t])) for t, s, _ in TOPIC_PAGES["reddit"]]
-    urls += [(f"/course/{c['slug']}/", newest([c])) for c in courses]
+        urls += [(topic_url("reddit", s), newest_in(by_topic["reddit"][t])) for t, s, _ in TOPIC_PAGES["reddit"]]
+    urls += [(f"/course/{c['slug']}/", newest([c])) for c in listing]
     (SITE / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         + "".join(f"<url><loc>{BASE}{u}</loc><lastmod>{m}</lastmod></url>\n" for u, m in urls)
