@@ -170,6 +170,25 @@ SITE_CARD = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
 </svg>"""
 
 
+# The site mark as standalone files: search engines show a site's favicon but can't fetch a data: URI.
+ICON = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<rect width="32" height="32" rx="7" fill="#ff6600"/>
+<path d="M9 10h14M9 16h10M9 22h6" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+</svg>
+"""
+
+
+def icons():
+    import io
+
+    from PIL import Image
+    site = ROOT / "site"
+    (site / "favicon.svg").write_text(ICON, encoding="utf-8")
+    (site / "apple-touch-icon.png").write_bytes(png(ICON.replace('rx="7"', 'rx="0"'), 180, 180))  # iOS rounds it
+    big = Image.open(io.BytesIO(png(ICON, 256, 256)))
+    big.save(site / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+
+
 def png(svg_text, width, height):
     """Rasterize for social previews, which don't accept SVG."""
     import resvg_py
@@ -186,7 +205,8 @@ def main():
         (OUT / f"{slug(topic)}.svg").write_text(art, encoding="utf-8")
         (OG / f"{slug(topic)}.png").write_bytes(png(art, 1200, 675))
     (OG / "site.png").write_bytes(png(SITE_CARD, 1200, 630))
-    print(f"wrote {len(names)} placeholders to {OUT} and social cards to {OG}")
+    icons()
+    print(f"wrote {len(names)} placeholders to {OUT}, social cards to {OG} and the favicons")
 
 
 if __name__ == "__main__":

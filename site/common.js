@@ -33,6 +33,17 @@
 
   window.HC = { load, store, toggleTheme, saved, toggleSaved };
 
+  // Pre-rendered cards (topic pages, the grid before app.js runs) swap a broken remote image
+  // for their topic illustration. Image errors don't bubble, so listen in the capture phase.
+  document.addEventListener("error", (e) => {
+    const img = e.target;
+    const box = img instanceof HTMLImageElement && img.closest(".thumb");
+    if (box && img.dataset.fallback && !box.classList.contains("art")) {
+      box.classList.add("art");
+      img.src = img.dataset.fallback;
+    }
+  }, true);
+
   document.addEventListener("DOMContentLoaded", () => {
     const help = document.getElementById("help");
     const q = document.getElementById("q");
