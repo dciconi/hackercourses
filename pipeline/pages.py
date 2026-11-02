@@ -556,14 +556,25 @@ def llms_full_txt(courses, meta):
     return "\n".join(out)
 
 
+def view(c, source):
+    """A course as one source sees it: the shared fields plus that source's stats (rank, score,
+    trend, recommenders, threads, first, last, years_active, badges, endorsements, strong_share,
+    recent_share) at the top level."""
+    return {k: v for k, v in c.items() if k != "sources"} | c["sources"][source]
+
+
 def write_all(courses, comments, data_end):
-    """courses must already carry slug, rank and the fields build.py computes."""
+    """courses: build.py's merged courses (shared fields, slug, related, sources).
+
+    Renders the Hacker News pages from HN views of the courses recommended on HN."""
+    courses = sorted((view(c, "hn") for c in courses if "hn" in c["sources"]), key=lambda c: c["rank"])
+    comments_hn = sum(1 for cm in comments if cm.get("src", "hn") == "hn")
     configure(data_end)
     by_id = {c["id"]: c for c in courses}
     for i, c in enumerate(courses):
         c["prev"] = courses[i - 1] if i > 0 else None
         c["next"] = courses[i + 1] if i + 1 < len(courses) else None
-    meta = {"courses": len(courses), "comments": len(comments), "data_end": data_end}
+    meta = {"courses": len(courses), "comments": comments_hn, "data_end": data_end}
     by_topic = {}
     for c in courses:
         by_topic.setdefault(c["topic"], []).append(c)
