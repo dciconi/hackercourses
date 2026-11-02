@@ -327,7 +327,10 @@ def about_page(meta):
   <a href="{REPO}/blob/main/DATA-LICENSE.md">DATA-LICENSE.md</a>.</p>
 
   <h2>Privacy and removal</h2>
-  <p>No accounts, no cookies, no tracking. Saved courses and your theme are kept in your own browser.
+  <p>No accounts and no cookies. Visits are counted with
+  <a href="https://www.cloudflare.com/web-analytics/" rel="noopener">Cloudflare Web Analytics</a>, which
+  doesn't use cookies or fingerprinting and doesn't follow you to other sites. Saved courses and your
+  theme are kept in your own browser.
   Each comment belongs to its author and links back to the original. To have a comment removed,
   <a href="{REPO}/issues/new?title=Removal%20request&amp;labels=removal">open a removal request</a>.</p>
 </main>
@@ -347,11 +350,13 @@ def not_found_page():
             + end([]))
 
 
+# Cloudflare injects its Web Analytics beacon into every page; the CSP allows that script and its
+# reporting endpoint and nothing else from outside the site.
 HEADERS = """/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
-  Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://cloudflareinsights.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'
 
 /img/*
   Cache-Control: public, max-age=2592000

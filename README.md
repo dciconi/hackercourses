@@ -28,6 +28,8 @@ Not affiliated with Y Combinator or Hacker News; Hacker News is credited only as
   | Anywhere | `/` search · T light/dark theme · `?` help |
 
 - **Private by design:** saved courses, seen markers and the theme live in your browser's storage only.
+  Visits are counted with Cloudflare Web Analytics (no cookies or fingerprinting); the security policy
+  allows that one script and nothing else from outside the site.
 
 ## How it works
 
