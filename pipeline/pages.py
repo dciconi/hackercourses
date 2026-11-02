@@ -570,9 +570,11 @@ def about_page(meta):
     ld = {"@context": "https://schema.org", "@graph": [
         {"@type": "AboutPage", "@id": f"{BASE}/about/", "url": f"{BASE}/about/", "name": f"About {NAME}",
          "description": desc, "isPartOf": {"@id": f"{BASE}/#website"}},
-        {"@type": "Dataset", "name": f"{NAME}: online courses recommended on Hacker News",
-         "description": (f"{meta['courses']:,} online courses recommended in {meta['comments']:,} public Hacker News "
-                         f"comments, {SPAN}, with rankings, summaries, topics, levels, costs and formats."),
+        {"@type": "Dataset", "name": f"{NAME}: online courses recommended on Hacker News" + (" and Reddit" if reddit else ""),
+         "description": (f"{meta.get('total', meta['courses']):,} online courses recommended in {meta['comments']:,} public Hacker News "
+                         + (f"comments, {SPAN}, and {meta.get('reddit_comments', 0):,} public Reddit comments" if reddit
+                            else f"comments, {SPAN}")
+                         + ", with rankings, summaries, topics, levels, costs and formats."),
          "url": f"{BASE}/", "sameAs": REPO, "license": "https://creativecommons.org/licenses/by/4.0/",
          "isAccessibleForFree": True, "keywords": ["online courses", "Hacker News", "MOOC", "computer science",
                                                    "programming", "recommendations"],
@@ -703,7 +705,7 @@ def llms_txt(courses, meta, by_topic, reddit=None):
                    else "Not affiliated with Y Combinator or Hacker News.")
     out = [f"# {NAME}", "",
            f"> The online courses programmers keep recommending, ranked from {meta['comments']:,} public Hacker News "
-           f"comments, {SPAN}: {meta['courses']:,} courses with a page each.", "",
+           f"comments, {SPAN}: {meta.get('total', meta['courses']):,} courses with a page each.", "",
            "Each course is scored from who recommended it, how strongly, in how many separate threads and for how "
            "many years (one vote per person; replies piling onto one thread are damped). Every course page quotes "
            "the comments behind its ranking and links each one to Hacker News. The catalog, rankings and summaries "
@@ -733,7 +735,7 @@ def llms_full_txt(courses, meta):
     reddit = bool(meta.get("reddit"))
     both = f" and {meta.get('reddit_comments', 0):,} public Reddit comments" if reddit else ""
     out = [f"# {NAME}: every course", "",
-           f"> {meta['courses']:,} online courses recommended in {meta['comments']:,} public Hacker News comments"
+           f"> {meta.get('total', meta['courses']):,} online courses recommended in {meta['comments']:,} public Hacker News comments"
            f"{both}, {SPAN}, in rank order. CC BY 4.0: cite {BASE}/ and link the course page."
            + (" Ranks are per source and never mixed." if reddit else ""), ""]
     for c in courses:
@@ -758,6 +760,8 @@ def llms_full_txt(courses, meta):
         if c["tags"]:
             out.append("Tags: " + ", ".join(c["tags"]))
         out += [""] + [p for p in (c["summary"], c["why"] and f"Why people recommend it: {c['why']}") if p] + [""]
+    if reddit:
+        out += llms_sources()
     return "\n".join(out)
 
 
@@ -820,10 +824,10 @@ def write_all(courses, comments, data_end):
                    "reddit": has_reddit,
                    "topics": {s: {slug for _, slug, _ in TOPIC_PAGES[s]} for s in SOURCE_NAMES}}
              for src in SOURCE_NAMES}
-    meta = metas["hn"]
+    meta = dict(metas["hn"])
     if has_reddit:
         years = [year(cm["t"]) for cm in reddit_comments]
-        meta |= {"reddit_comments": comments_in["reddit"], "reddit_subs": REDDIT_SUBS,
+        meta |= {"total": len(listing), "reddit_comments": comments_in["reddit"], "reddit_subs": REDDIT_SUBS,
                  "reddit_years": (min(years), max(years))}
 
     for old in (SITE / "course").glob("*/index.html"):

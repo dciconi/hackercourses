@@ -16,6 +16,8 @@ T = 1_710_000_000
 def isolated_module_state(monkeypatch):
     """pages keeps per-run state in module globals; give every test its own copy."""
     monkeypatch.setattr(pages, "TOPIC_PAGES", {"hn": [], "reddit": []})
+    monkeypatch.setattr(pages, "SPAN", pages.SPAN)
+    monkeypatch.setattr(pages, "TAGLINE", pages.TAGLINE)
     monkeypatch.setattr(pages, "REDDIT_COMMUNITIES", 30)
     monkeypatch.setattr(pages, "REDDIT_SUBS", list(sources.SUBREDDITS))
 
@@ -201,6 +203,8 @@ def test_llms_files_with_reddit():
     full = pages.llms_full_txt([hn, rd], REDDIT_META)
     assert "#1 on Hacker News" in full and "#5 on Reddit" in full and "#1 on Reddit" in full
     assert full.index("Both") < full.index("Solo")
+    assert "academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10" in full
+    assert "3 online courses" in pages.llms_full_txt([hn, rd], REDDIT_META | {"total": 3})
     plain_meta = {"courses": 1, "comments": 5, "data_end": T}
     assert "Reddit" not in pages.llms_txt(hv, plain_meta, {"General Learning": hv})
     assert "Reddit" not in pages.llms_full_txt([hn], plain_meta)
