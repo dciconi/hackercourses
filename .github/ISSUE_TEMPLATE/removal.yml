@@ -1,5 +1,5 @@
 name: Remove my comment
-description: Ask for a Hacker News comment you wrote to be taken off hackercourses.com.
+description: Ask for a Hacker News or Reddit comment you wrote to be taken off hackercourses.com.
 title: "Removal request"
 labels: ["removal"]
 body:
@@ -9,21 +9,21 @@ body:
         If you wrote a comment quoted on Hacker Courses and want it taken down, tell us which one.
         It's removed on the next deploy and stays removed in future data refreshes.
 
-        This issue is public. If you'd rather not ask in public, say so and leave only the HN username
+        This issue is public. If you'd rather not ask in public, say so and leave only the username
         you want removed, or ask for everything by your username.
   - type: input
     id: comment
     attributes:
       label: Link to the comment
-      description: The Hacker News link (news.ycombinator.com/item?id=...) or the "Open comment" link from the course page.
-      placeholder: https://news.ycombinator.com/item?id=12345678
+      description: The Hacker News link (news.ycombinator.com/item?id=...), the Reddit comment link (reddit.com/r/.../comments/.../...), or the "Open comment" link from the course page.
+      placeholder: https://news.ycombinator.com/item?id=12345678 or https://www.reddit.com/r/learnprogramming/comments/abc123/title/def456/
     validations:
       required: false
   - type: input
     id: username
     attributes:
-      label: Or remove everything by this HN username
-      placeholder: your-hn-username
+      label: Or remove everything by this username (say Hacker News or Reddit)
+      placeholder: your-username (Hacker News or Reddit)
     validations:
       required: false
   - type: checkboxes
