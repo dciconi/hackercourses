@@ -71,3 +71,94 @@ def test_dedupe_reddit_keeps_hn_entry_with_reddit_keeper(monkeypatch):
     monkeypatch.setattr(canonicalize, "structured", lambda *a, **k: ({"groups": [[0, 1]]}, 0.0))
     canonicalize.dedupe_reddit(cat, "key")
     assert "merged_into" not in cat["courses"][1]  # hn entry is never the duplicate
+    assert cat["courses"][0]["merged_into"] == 1  # the Reddit entry joins the HN one
+
+
+def test_dedupe_reddit_merges_reddit_entry_into_hn_whatever_the_order(monkeypatch):
+    import canonicalize
+    cat = {"courses": [{"id": 0, **c("Algo", "Coursera"), "origin": "reddit"},
+                       {"id": 1, **c("Algo", "Coursera")},
+                       {"id": 2, **c("Algo", "Coursera (Princeton)")}], "aliases": {}}
+    monkeypatch.setattr(canonicalize, "structured", lambda *a, **k: ({"groups": [[0, 1, 2]]}, 0.0))
+    canonicalize.dedupe_reddit(cat, "key")
+    assert cat["courses"][0]["merged_into"] == 1
+    assert "merged_into" not in cat["courses"][1] and "merged_into" not in cat["courses"][2]
+
+
+# ---- main(): mapping runs and the CLI ---------------------------------------
+
+def run_main(tmp_path, monkeypatch, argv, cat, reddit_courses=(), answer=None):
+    import json
+
+    import canonicalize
+    import sources
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(json.dumps(cat), encoding="utf-8")
+    fake = sources.Paths(*(tmp_path / n for n in ("c.jsonl", "p.json", "l.jsonl", "co.json", "t.json", "s.jsonl")))
+    fake.courses.write_text(json.dumps(list(reddit_courses)), encoding="utf-8")
+    calls = []
+
+    def fake_structured(*a, **k):
+        calls.append(a)
+        return answer, 0.0
+
+    monkeypatch.setattr(canonicalize, "CATALOG", catalog)
+    monkeypatch.setattr(canonicalize, "paths", lambda s: fake)
+    monkeypatch.setattr(canonicalize, "api_key", lambda: "k")
+    monkeypatch.setattr(canonicalize, "structured", fake_structured)
+    monkeypatch.setattr(sys, "argv", ["canonicalize.py", *argv])
+    canonicalize.main()
+    return json.loads(catalog.read_text(encoding="utf-8")), calls
+
+
+def test_reddit_run_never_rewrites_an_hn_alias(tmp_path, monkeypatch):
+    cat = {"courses": [{"id": 0, **c("CS50", "Harvard")}], "aliases": {"CS50|Harvard": 0}}
+    comments = [{"id": "t1_a", "courses": [c("CS50", "Harvard"), c("CS50", "Harvard University")]},
+                {"id": "t1_b", "courses": [c("CS50", "Harvard")]}]
+    answer = {"items": [{"ref": 0, "match_id": None, "not_a_course": True, "name": "", "provider": ""}]}
+    out, _ = run_main(tmp_path, monkeypatch, ["--source", "reddit"], cat, comments, answer)
+    assert out["aliases"]["CS50|Harvard"] == 0
+    assert out["aliases"]["CS50|Harvard University"] is None
+
+
+def test_reddit_run_new_entry_leaves_hn_alias_alone(tmp_path, monkeypatch):
+    cat = {"courses": [{"id": 0, **c("CS50", "Harvard")}], "aliases": {"CS50|Harvard": 0}}
+    comments = [{"id": "t1_a", "courses": [c("CS50", "Harvard"), c("CS50", "Harvard University")]}]
+    answer = {"items": [{"ref": 0, "match_id": None, "not_a_course": False, "name": "CS50x", "provider": "edX"}]}
+    out, _ = run_main(tmp_path, monkeypatch, ["--source", "reddit"], cat, comments, answer)
+    assert out["aliases"]["CS50|Harvard"] == 0
+    assert out["aliases"]["CS50|Harvard University"] == 1 and out["courses"][1]["origin"] == "reddit"
+
+
+def test_hn_wide_dedupe_refuses_once_reddit_entries_exist(tmp_path, monkeypatch, capsys):
+    import pytest
+    cat = {"courses": [{"id": 0, **c("A", "X")}, {"id": 1, **c("A", "X"), "origin": "reddit", "merged_into": 0}],
+           "aliases": {}}
+    with pytest.raises(SystemExit) as exc:
+        run_main(tmp_path, monkeypatch, ["--dedupe"], cat, answer={"groups": []})
+    assert "--dedupe-reddit" in str(exc.value)
+    import json
+    assert json.loads((tmp_path / "catalog.json").read_text(encoding="utf-8")) == cat  # untouched
+
+
+def test_hn_wide_dedupe_runs_without_reddit_entries(tmp_path, monkeypatch):
+    cat = {"courses": [{"id": 0, **c("A", "X")}, {"id": 1, **c("B", "Y"), "merged_into": 0}], "aliases": {}}
+    out, calls = run_main(tmp_path, monkeypatch, ["--dedupe"], cat, answer={"groups": []})
+    assert len(calls) == 1 and "merged_into" not in out["courses"][1]  # re-run starts clean
+
+
+def test_cli_rejects_bad_combinations(tmp_path, monkeypatch):
+    import pytest
+    cat = {"courses": [], "aliases": {}}
+    for argv in (["--source", "reddit", "--dedupe"], ["--source", "lobsters"], ["--dedupe", "--dedupe-reddit"]):
+        with pytest.raises(SystemExit) as exc:
+            run_main(tmp_path, monkeypatch, argv, cat, answer={"groups": []})
+        assert exc.value.code != 0
+
+
+def test_cli_limit_is_positional(tmp_path, monkeypatch):
+    cat = {"courses": [], "aliases": {}}
+    comments = [{"id": "t1_a", "courses": [c("Alpha", "X")]}, {"id": "t1_b", "courses": [c("Beta", "Y")]}]
+    answer = {"items": [{"ref": 0, "match_id": None, "not_a_course": False, "name": "", "provider": ""}]}
+    out, calls = run_main(tmp_path, monkeypatch, ["--source", "reddit", "1"], cat, comments, answer)
+    assert len(calls) == 1 and len(out["aliases"]) == 1
