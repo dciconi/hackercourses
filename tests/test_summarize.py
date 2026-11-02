@@ -65,3 +65,21 @@ def test_reddit_run_never_writes_hn_summaries(tmp_path, monkeypatch):
     assert 'thread="Best CS course?"' in prompts[0] and "CS50 is great" not in prompts[0]
     assert summarize.load("reddit")[0]["stances"] == {"t1_abc": "strongly_recommends"}
     assert summarize.load("hn")[0]["comment_ids"] == [42]
+
+
+def test_hn_string_stance_id_is_normalized_not_dropped(monkeypatch):
+    def fake(key, model, system, user, schema, max_tokens=0):
+        assert schema["properties"]["stances"]["items"]["properties"]["comment_id"]["type"] == "integer"
+        return {"url_index": None, "stances": [{"comment_id": "42", "stance": "recommends"}]}, 0.0
+
+    monkeypatch.setattr(summarize, "structured", fake)
+    comments = [{"id": 42, "text": "CS50", "links": []}]
+    out, _ = summarize.summarize({"id": 0, "name": "CS50", "provider": "Harvard"}, comments, {}, "k")
+    assert out["stances"] == {"42": "recommends"} and out["comment_ids"] == [42]
+    assert summarize.schema_for("reddit")["properties"]["stances"]["items"]["properties"]["comment_id"] == {"type": "string"}
+
+
+def test_covered_and_chosen_ids_with_reddit_ids():
+    assert summarize.covered({"stances": {"42": "x", "t1_abc": "y"}}) == {42, "t1_abc"}
+    assert summarize.covered({"comment_ids": ["t1_abc"], "stances": {}}) == {"t1_abc"}
+    assert summarize.chosen_ids([{"id": "t1_a", "text": "xx"}, {"id": "t1_b", "text": "y"}]) == {"t1_a", "t1_b"}

@@ -11,6 +11,7 @@ build.py takes only the `stances` of the Reddit line.
 """
 
 import argparse
+import copy
 import json
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -63,11 +64,20 @@ SCHEMA = {
         "url_index": {"type": ["integer", "null"]},
         "stances": {"type": "array", "items": {
             "type": "object", "additionalProperties": False, "required": ["comment_id", "stance"],
-            "properties": {"comment_id": {"type": ["integer", "string"]}, "stance": {"type": "string", "enum": STANCES}},
+            "properties": {"comment_id": {"type": "integer"}, "stance": {"type": "string", "enum": STANCES}},
         }},
         "topic": {"type": "string", "enum": TOPIC_NAMES},
     },
 }
+
+
+def schema_for(source):
+    """HN comment ids are integers; Reddit's are strings like "t1_abc"."""
+    if source == "hn":
+        return SCHEMA
+    sch = copy.deepcopy(SCHEMA)
+    sch["properties"]["stances"]["items"]["properties"]["comment_id"] = {"type": "string"}
+    return sch
 
 
 def course_comments(source=None):
@@ -104,15 +114,16 @@ def build_prompt(course, comments, threads):
     return "\n".join(parts), links, chosen
 
 
-def summarize(course, comments, threads, key):
+def summarize(course, comments, threads, key, source="hn"):
     user, links, chosen = build_prompt(course, comments, threads)
-    out, cost = structured(key, MODEL, SYSTEM, user, SCHEMA, max_tokens=4096)
+    out, cost = structured(key, MODEL, SYSTEM, user, schema_for(source), max_tokens=4096)
     idx = out.pop("url_index")
     out["url"] = links[idx] if isinstance(idx, int) and 0 <= idx < len(links) else None
     valid = {it["id"] for it in chosen}
-    out["stances"] = {str(s["comment_id"]): s["stance"] for s in out["stances"] if s["comment_id"] in valid}
+    by_str = {str(i): i for i in valid}  # a stray "42" for int 42 must not drop the stance
+    out["stances"] = {str(s["comment_id"]): s["stance"] for s in out["stances"] if str(s["comment_id"]) in by_str}
     out["id"] = course["id"]
-    out["comment_ids"] = sorted(valid)  # lets a later run tell when the course gained comments
+    out["comment_ids"] = (sorted(valid) if len({type(i) for i in valid}) < 2 else sorted(valid, key=str))  # lets a later run tell when the course gained comments
     return out, cost
 
 
@@ -154,7 +165,7 @@ def main():
     print(f"{len(by_course)} courses, {len(todo)} to summarize", flush=True)
     cost, n = 0.0, 0
     with ThreadPoolExecutor(WORKERS) as ex, p.summaries.open("a", encoding="utf-8") as f:
-        futures = [ex.submit(summarize, cat["courses"][cid], by_course[cid], threads, key) for cid in todo]
+        futures = [ex.submit(summarize, cat["courses"][cid], by_course[cid], threads, key, args.source) for cid in todo]
         for fut in as_completed(futures):
             try:
                 out, c = fut.result()
