@@ -10,6 +10,7 @@ import re
 import time
 from html import escape
 
+import rank
 import sources
 from classify import OTHER, ROOT, TOPICS
 
@@ -411,7 +412,9 @@ def comment_item(cm, s, src):
     thread = f'<span class="thread">in “{e(cm["thread"])}”</span>' if cm["thread"] else ""
     if src == "reddit":
         sub = f'<span>r/{e(cm["sub"])}</span>' if cm.get("sub") else ""
-        ups = f'<span class="ups">▲ {cm["ups"]:,}</span>' if cm.get("ups") is not None else ""
+        # Votes captured too soon after posting say little, so they are not shown (nor counted).
+        settled = cm.get("age") is not None and cm["age"] >= rank.UPVOTE_MIN_AGE
+        ups = f'<span class="ups">▲ {cm["ups"]:,}</span>' if cm.get("ups") is not None and settled else ""
         return (f'<li class="comment"><header><span class="stance s{s}">{STANCE[s]}</span><strong>{e(cm["by"])}</strong>'
                 f'{sub}<span>{year(cm["t"])}</span>{thread}{ups}</header>'
                 f'<div>{comment_body(cm["text"])}</div>'
@@ -789,8 +792,9 @@ def remove_reddit_pages(root):
         pass
 
 
-def write_all(courses, comments, data_end):
-    """courses: build.py's merged courses (shared fields, slug, related, sources).
+def write_all(courses, comments, data_end, reddit_end=None):
+    """courses: build.py's merged courses (shared fields, slug, related, sources). data_end and
+    reddit_end: the newest Hacker News and Reddit comment times.
 
     Every course gets a page (Hacker News ones, then Reddit-only ones). Each source's grid and topic
     pages are rendered from that source's views. The switch and the Reddit pages exist only when some
@@ -820,7 +824,8 @@ def write_all(courses, comments, data_end):
             by_topic[src].setdefault(c["topic"], []).append(c)
         TOPIC_PAGES[src][:] = [(t, topic_slug(t), len(by_topic[src][t]))
                                for t in [name for name, _ in TOPICS] + [OTHER] if t in by_topic[src]]
-    metas = {src: {"courses": len(ranked[src]), "comments": comments_in[src], "data_end": data_end,
+    ends = {"hn": data_end, "reddit": reddit_end or data_end}
+    metas = {src: {"courses": len(ranked[src]), "comments": comments_in[src], "data_end": ends[src],
                    "reddit": has_reddit,
                    "topics": {s: {slug for _, slug, _ in TOPIC_PAGES[s]} for s in SOURCE_NAMES}}
              for src in SOURCE_NAMES}
@@ -870,7 +875,7 @@ def write_all(courses, comments, data_end):
     urls = [("/", iso(data_end)), ("/about/", iso(data_end))]
     urls += [(f"/topic/{s}/", newest_in(by_topic["hn"][t])) for t, s, _ in TOPIC_PAGES["hn"]]
     if has_reddit:
-        urls.append(("/reddit/", iso(data_end)))
+        urls.append(("/reddit/", iso(ends["reddit"])))
         urls += [(topic_url("reddit", s), newest_in(by_topic["reddit"][t])) for t, s, _ in TOPIC_PAGES["reddit"]]
     urls += [(f"/course/{c['slug']}/", newest([c])) for c in listing]
     (SITE / "sitemap.xml").write_text(

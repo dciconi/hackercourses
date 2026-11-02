@@ -80,7 +80,7 @@ def test_no_reddit_courses_means_no_switch_or_reddit_links():
 
 HN_CM = {"id": 11, "by": "alice", "t": T, "text": "Great course", "thread": "Ask HN: learn CS?", "tid": 5}
 RD_CM = {"id": "abc", "by": "bob", "t": T, "text": "z" * 299 + "…", "thread": "Where to learn?", "tid": "t3_x",
-         "src": "reddit", "sub": "learnprogramming", "ups": 42,
+         "src": "reddit", "sub": "learnprogramming", "ups": 42, "age": 90 * 86400,
          "url": "https://www.reddit.com/r/learnprogramming/comments/x/_/abc/"}
 COMMENTS = [HN_CM, RD_CM]
 
@@ -240,3 +240,24 @@ def test_write_all_removes_stale_reddit_pages_when_data_absent(tmp_path, monkeyp
     assert not list((tmp_path / "reddit").rglob("*.html"))
     assert "reddit" not in (tmp_path / "sitemap.xml").read_text(encoding="utf-8").lower()
     assert "Reddit" not in (tmp_path / "about" / "index.html").read_text(encoding="utf-8")
+
+
+def test_upvotes_hidden_when_captured_too_soon_or_age_unknown():
+    shown = pages.comment_item(RD_CM, 3, "reddit")
+    assert "▲ 42" in shown
+    for age in (None, 29 * 86400):
+        assert "▲" not in pages.comment_item(RD_CM | {"age": age}, 3, "reddit")
+    assert "▲" not in pages.comment_item({k: v for k, v in RD_CM.items() if k != "age"}, 3, "reddit")
+
+
+def test_reddit_home_and_sitemap_use_the_reddit_data_end(tmp_path, monkeypatch):
+    monkeypatch.setattr(pages, "SITE", tmp_path)
+    (tmp_path / "course").mkdir()
+    rd_end = T - 400 * 86400
+    both = merged(1, "Both", hn=stats(1, [[0, 3]]), reddit=stats(2, [[1, 3]]))
+    pages.write_all([both], COMMENTS, T, rd_end)
+    sm = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert f"<loc>{pages.BASE}/reddit/</loc><lastmod>{pages.iso(rd_end)}</lastmod>" in sm
+    assert f"<loc>{pages.BASE}/</loc><lastmod>{pages.iso(T)}</lastmod>" in sm
+    assert f'"dateModified": "{pages.iso(rd_end)}"' in (tmp_path / "reddit" / "index.html").read_text(encoding="utf-8")
+    assert f'"dateModified": "{pages.iso(T)}"' in (tmp_path / "index.html").read_text(encoding="utf-8")

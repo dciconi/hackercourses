@@ -17,7 +17,7 @@ import reddit
 import removals
 import sources
 import summarize
-from classify import OTHER, ROOT, TOPICS
+from classify import OTHER, QUOTE, ROOT, TOPICS
 from images import OUT as IMAGES
 
 STANCE_CODE = {"strongly_recommends": 3, "recommends": 2, "mentions": 1, "criticizes": 0}
@@ -64,9 +64,16 @@ def comment_entry(it, threads):
     tid, title = threads.get(str(it["id"])) or [it.get("thread") or it["id"], None]
     if it.get("src") != "reddit":
         return {"id": it["id"], "by": it["by"], "t": it["time"], "text": it["text"], "thread": title, "tid": tid}
-    return {"id": it["id"], "by": it["by"], "t": it["time"], "text": pages.clip(it["text"], REDDIT_EXCERPT),
-            "thread": title, "tid": tid, "src": "reddit", "sub": it["sub"], "ups": it["ups"],
+    return {"id": it["id"], "by": it["by"], "t": it["time"], "text": excerpt(it["text"]),
+            "thread": title, "tid": tid, "src": "reddit", "sub": it["sub"], "ups": it["ups"], "age": it.get("age"),
             "url": reddit.permalink(it)}
+
+
+def excerpt(text):
+    """The commenter's own words, clipped: quoted lines (someone else's words) are dropped first,
+    unless the comment is nothing but a quote."""
+    own = QUOTE.sub("\n", text).strip()
+    return pages.clip(own or text, REDDIT_EXCERPT)
 
 
 def check_file_count(root, limit=MAX_FILES):
@@ -209,7 +216,7 @@ def main():
         write_js(REDDIT_COURSES_JS, grid_payload(courses, comments, "reddit", ends_at["reddit"]))
     elif REDDIT_COURSES_JS.exists():
         REDDIT_COURSES_JS.unlink()
-    pages.write_all(courses, comments, ends_at["hn"])
+    pages.write_all(courses, comments, ends_at["hn"], ends_at.get("reddit"))
     if OLD_DATA_JS.exists():
         OLD_DATA_JS.unlink()
     n_files = check_file_count(SITE)

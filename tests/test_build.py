@@ -132,3 +132,18 @@ def test_assemble_merges_sources_hn_first():
     assert reddit_cms and all(cm["url"].startswith("https://www.reddit.com/") for cm in reddit_cms)
     assert "t1_r5" not in {cm["id"] for cm in comments}
     assert ends_at == {"hn": Y2024 + 5, "reddit": Y2024}
+
+
+def test_reddit_excerpt_skips_quoted_text():
+    it = {"id": "t1_q", "src": "reddit", "by": "u1", "time": Y2024, "text": "> their words\n\nmy words about CS50",
+          "sub": "learnprogramming", "ups": 3, "age": 10**8, "thread": "t3_abc"}
+    assert build.comment_entry(it, {})["text"].startswith("my words")
+    only_quote = it | {"text": "> just a quote of CS50"}
+    assert build.comment_entry(only_quote, {})["text"] == "> just a quote of CS50"  # nothing else to show
+
+
+def test_reddit_comment_entry_carries_capture_age():
+    it = {"id": "t1_q", "src": "reddit", "by": "u1", "time": Y2024, "text": "CS50", "sub": "s", "ups": 3,
+          "age": 123, "thread": "t3_abc"}
+    assert build.comment_entry(it, {})["age"] == 123
+    assert build.comment_entry(it | {"age": None}, {})["age"] is None
