@@ -51,6 +51,14 @@ Parquet files, read column-wise with DuckDB, for October 2024 to August 2026; th
 [HN Search API](https://hn.algolia.com/api) for the weeks after; and the official
 [HN API](https://github.com/HackerNews/API) for thread titles.
 
+Reddit comments (a separate, separately ranked source) come from the per-subreddit dump files of the
+Pushshift archive ("top 40k subreddits, 2005-06 to 2023-12", compiled by u/Watchful1), distributed on
+[Academic Torrents](https://academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10)
+(infohash `56aa49f9653ba545f48df2e33679f014d2829c10`; no licence is stated in the Arctic Shift release
+table that links to it, and the torrent page itself sat behind a browser check and was not read). Only the comment and submission files of the 30 subreddits in
+`pipeline/sources.py` are downloaded. Coverage ends December 2023; indiehackers, ClaudeAI and PKMS are not
+in that archive. Used here as an archive as-is, with `removals.txt` honored.
+
 **Filtering.** Keyword rules drop dead/deleted items, coupon, affiliate and referral links, URL
 shorteners, self-promotion, copy-paste duplicates and accounts posting the same course link five or more
 times, and keep comments where an endorsement sits next to a *specific* course. An AI review then decides
@@ -112,6 +120,14 @@ uv run python pipeline/images.py             # course preview images -> data/ima
 uv run python pipeline/discover_images.py    # images for courses with dead links
 uv run python pipeline/placeholders.py       # topic illustrations and social cards
 uv run python pipeline/build.py              # ranking + every page -> site/
+```
+
+**Reddit dumps** (separate from the HN steps; needs a torrent client that can select files, for example
+`uv run --no-project --with libtorrent python` with a magnet link for the infohash above, selecting only
+`reddit/subreddits23/<sub>_comments.zst` and `<sub>_submissions.zst`). Put the files in `data/reddit/raw/`, then:
+
+```bash
+uv run python pipeline/fetch_reddit.py --raw data/reddit/raw --since 2023-01-01   # -> data/reddit/candidates.jsonl, threads.json
 ```
 
 **Refresh with new comments** (minutes; about $0.30): run `fetch_recent.py`, then the same steps from

@@ -29,6 +29,7 @@ _SUBS = {s.lower() for s in SUBREDDITS}
 _GONE = ("[deleted]", "[removed]")
 _MD_LINK = re.compile(r"\[([^\]]*)\]\((https?://[^)\s]+)\)")
 _BARE_URL = re.compile(r"https?://[^\s)\]>]+")
+_TRAILING = ".,;:!?)"
 
 
 def to_text(md: str) -> tuple[str, list[str]]:
@@ -41,7 +42,7 @@ def to_text(md: str) -> tuple[str, list[str]]:
         return m.group(1)
 
     text = _MD_LINK.sub(keep, md)
-    links += _BARE_URL.findall(text)
+    links += [u.rstrip(_TRAILING) for u in _BARE_URL.findall(text)]
     return text, links
 
 
@@ -52,10 +53,17 @@ def candidate(raw: dict) -> dict | None:
         return None
     if sub.lower() not in _SUBS or not PREFILTER.search(body):
         return None
-    created = int(raw["created_utc"])
-    seen = raw.get("retrieved_on") or raw.get("retrieved_utc")
+    try:
+        created = int(raw["created_utc"])
+        seen = raw.get("retrieved_on") or raw.get("retrieved_utc")
+        age = int(seen) - created if seen else None
+        ups = int(raw.get("score") or 0)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not raw.get("id") or not str(raw.get("link_id") or "").startswith("t3_"):
+        return None
     return {"id": f"t1_{raw['id']}", "by": author, "time": created, "text": body, "src": "reddit",
-            "sub": sub, "ups": int(raw.get("score") or 0), "age": int(seen) - created if seen else None,
+            "sub": sub, "ups": ups, "age": age,
             "thread": raw.get("link_id")}
 
 

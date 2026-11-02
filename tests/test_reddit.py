@@ -70,3 +70,20 @@ def test_prefilter_catches_reddit_only_names_and_hosts():
     assert reddit.PREFILTER.search("see https://maven.com/x")
     assert reddit.PREFILTER.search("a great lecture")
     assert reddit.REDDIT_SPAM.search("check out my profile")
+
+
+def test_candidate_returns_none_on_missing_or_garbage_fields():
+    for key in ("created_utc", "id", "author", "body", "link_id"):
+        r = raw()
+        del r[key]
+        assert reddit.candidate(r) is None, key
+    assert reddit.candidate(raw(created_utc="soon")) is None
+    assert reddit.candidate(raw(created_utc=None)) is None
+    assert reddit.candidate(raw(id="")) is None
+    assert reddit.candidate(raw(body=None)) is None
+    assert reddit.candidate(raw(link_id="")) is None
+
+
+def test_to_text_bare_url_drops_trailing_punctuation():
+    _, links = reddit.to_text("See https://ocw.mit.edu/x. Also (https://a.com/b), and https://c.org/d!? Then https://e.io/f;")
+    assert links == ["https://ocw.mit.edu/x", "https://a.com/b", "https://c.org/d", "https://e.io/f"]
