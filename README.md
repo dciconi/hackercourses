@@ -3,8 +3,8 @@
 **The online courses programmers keep recommending, ranked from public Hacker News comments since 2006.**
 
 1,376 courses drawn from 3,371 recommendation comments, 2006 to October 2026, in a fast, static,
-keyboard-navigable site. No accounts, no cookies, no backend. Coming to
-[hackercourses.com](https://hackercourses.com).
+keyboard-navigable site. No accounts, no cookies, no backend. Live at
+**[hackercourses.com](https://hackercourses.com)**.
 
 Dedicated to [Andrej Karpathy](https://x.com/karpathy), whose idea prompted
 [HackerTube](https://hackertube.org), the collection of videos programmers keep telling each other
@@ -152,8 +152,8 @@ data/       working data (git-ignored; rebuilt by the pipeline)
 
 Static hosting on [Cloudflare Pages](https://pages.cloudflare.com), connected to this repository:
 production branch `main`, framework preset *None*, no build command, build output directory `site`.
-Once connected, every push to `main` deploys. The domain is registered at Namecheap and uses
-Cloudflare's nameservers.
+Every push to `main` deploys to [hackercourses.com](https://hackercourses.com). The domain is
+registered at Namecheap and uses Cloudflare's nameservers.
 
 ## Contributing and removal requests
 
