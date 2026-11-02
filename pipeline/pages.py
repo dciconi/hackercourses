@@ -37,10 +37,10 @@ REDDIT_SUBS = list(sources.SUBREDDITS)  # likewise: the configured subreddits th
 SUBREDDIT_GROUPS = [
     ("Business & entrepreneurship", ["Entrepreneur", "startups", "smallbusiness", "SaaS", "indiehackers",
                                      "EntrepreneurRideAlong"]),
-    ("Software development", ["programming", "ExperiencedDevs", "webdev", "learnprogramming", "Python", "selfhosted"]),
+    ("Software development", ["programming", "ExperiencedDevs", "webdev", "learnprogramming", "Python"]),
     ("AI & ML", ["MachineLearning", "LocalLLaMA", "artificial", "ChatGPT", "ClaudeAI", "learnmachinelearning"]),
-    ("Productivity", ["productivity", "getdisciplined", "Notion", "ObsidianMD", "PKMS", "bujo"]),
-    ("Marketing & growth", ["marketing", "PPC", "SEO", "bigseo", "socialmedia", "Emailmarketing"]),
+    ("Productivity", ["productivity", "getdisciplined", "Notion", "PKMS"]),
+    ("Marketing & growth", ["marketing", "PPC", "SEO"]),
 ]
 # The only Reddit data in use: a per-subreddit dump of Reddit's own comments, 2005-06 to 2023-12.
 REDDIT_DUMP = "https://academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10"

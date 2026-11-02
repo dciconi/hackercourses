@@ -57,7 +57,7 @@ def test_reddit_ids_never_collide_with_hn():
 def test_hn_paths_unchanged():
     assert sources.paths("hn").pool == ROOT / "data" / "pool.json"
     assert sources.paths("reddit").pool == ROOT / "data" / "reddit" / "pool.json"
-    assert len(sources.SUBREDDITS) == 30
+    assert len(sources.SUBREDDITS) == 24
 
 
 def test_permalink():

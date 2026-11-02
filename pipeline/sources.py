@@ -10,11 +10,14 @@ SOURCES = ("hn", "reddit")
 
 SUBREDDITS = (
     "Entrepreneur", "startups", "smallbusiness", "SaaS", "indiehackers", "EntrepreneurRideAlong",
-    "programming", "ExperiencedDevs", "webdev", "learnprogramming", "Python", "selfhosted",
+    "programming", "ExperiencedDevs", "webdev", "learnprogramming", "Python",
     "MachineLearning", "LocalLLaMA", "artificial", "ChatGPT", "ClaudeAI", "learnmachinelearning",
-    "productivity", "getdisciplined", "Notion", "ObsidianMD", "PKMS", "bujo",
-    "marketing", "PPC", "SEO", "bigseo", "socialmedia", "Emailmarketing",
+    "productivity", "getdisciplined", "Notion", "PKMS",
+    "marketing", "PPC", "SEO",
 )
+
+# Dropped after the 2021-2023 pilot (owner decision, 2026-11-02): bujo, socialmedia, bigseo,
+# ObsidianMD, selfhosted, Emailmarketing. classify.py ignores their rows if they are still in the data.
 
 
 @dataclass(frozen=True)

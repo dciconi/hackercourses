@@ -70,3 +70,12 @@ def test_new_topics_take_marketing_and_productivity_from_business():
     assert classify.topic_of("a seo and copywriting course", []) == "Marketing & Growth"
     assert classify.topic_of("a course on habits and deep work", []) == "Productivity & Personal Development"
     assert classify.topic_of("a course on venture finance", []) == "Business, Finance & Economics"
+
+
+def test_reddit_rows_from_dropped_subreddits_are_discarded():
+    import json
+    row = rd(RECOMMEND)
+    assert classify.classify_line(json.dumps(row), "reddit")[1] == "kept"
+    assert classify.classify_line(json.dumps(row | {"sub": "Marketing"}), "reddit")[1] == "kept"
+    assert classify.classify_line(json.dumps(row | {"sub": "bigseo"}), "reddit") == (None, "dropped-subreddit")
+    assert classify.classify_line(json.dumps(row | {"sub": "bigseo"}))[1] != "dropped-subreddit"

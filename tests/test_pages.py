@@ -18,7 +18,7 @@ def isolated_module_state(monkeypatch):
     monkeypatch.setattr(pages, "TOPIC_PAGES", {"hn": [], "reddit": []})
     monkeypatch.setattr(pages, "SPAN", pages.SPAN)
     monkeypatch.setattr(pages, "TAGLINE", pages.TAGLINE)
-    monkeypatch.setattr(pages, "REDDIT_COMMUNITIES", 30)
+    monkeypatch.setattr(pages, "REDDIT_COMMUNITIES", 24)
     monkeypatch.setattr(pages, "REDDIT_SUBS", list(sources.SUBREDDITS))
 
 
@@ -50,7 +50,7 @@ def test_reddit_home_copy_and_search_action():
     assert "<title>Hacker Courses: the online courses Reddit recommends</title>" in home
     assert "<h1 class=\"visually-hidden\">The online courses recommended most on Reddit</h1>" in home
     assert 'action="/reddit/"' in home
-    assert "ranked from 1,234 public comments in 30 communities." in home
+    assert "ranked from 1,234 public comments in 24 communities." in home
     assert "/reddit/courses.js" in home
     assert "Best Programming courses, as recommended on Reddit" in topic
     assert 'href="/topic/programming/"' in topic  # switch points at the HN twin of this topic

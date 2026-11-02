@@ -44,10 +44,14 @@ they're looking at. Normalizing scores across sources is explicitly out of scope
 | Group | Subreddits |
 |---|---|
 | Business & entrepreneurship | Entrepreneur, startups, smallbusiness, SaaS, indiehackers, EntrepreneurRideAlong |
-| Software development | programming, ExperiencedDevs, webdev, learnprogramming, Python, selfhosted |
+| Software development | programming, ExperiencedDevs, webdev, learnprogramming, Python, ~~selfhosted~~ |
 | AI & ML | MachineLearning, LocalLLaMA, artificial, ChatGPT, ClaudeAI, learnmachinelearning |
-| Productivity | productivity, getdisciplined, Notion, ObsidianMD, PKMS, bujo |
-| Marketing & growth | marketing, PPC, SEO, bigseo, socialmedia, Emailmarketing |
+| Productivity | productivity, getdisciplined, Notion, ~~ObsidianMD~~, PKMS, ~~bujo~~ |
+| Marketing & growth | marketing, PPC, SEO, ~~bigseo~~, ~~socialmedia~~, ~~Emailmarketing~~ |
+
+Struck-through subreddits (bujo, socialmedia, bigseo, ObsidianMD, selfhosted, Emailmarketing) were
+dropped after the 2021–2023 pilot (owner decision, 2026-11-02); 24 remain configured. `classify.py --source reddit`
+discards any row from a subreddit not in the configured list.
 
 Kept as a list in one config file. Each Reddit comment keeps its subreddit, and course pages show it
 ("r/learnprogramming, 2023").

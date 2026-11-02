@@ -266,8 +266,13 @@ def apply_labels(pool, reasons, LABELS=LABELS):
     return out
 
 
+SUBREDDITS_LOWER = {s.lower() for s in sources.SUBREDDITS}
+
+
 def classify_line(line, source="hn"):
     row = json.loads(line)
+    if source == "reddit" and (row.get("sub") or "").lower() not in SUBREDDITS_LOWER:
+        return None, "dropped-subreddit"
     if not row.get("text") or not row.get("by"):
         return None, "empty"
     return classify(row, source)
