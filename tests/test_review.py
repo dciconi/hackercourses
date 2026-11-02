@@ -52,7 +52,7 @@ def test_reddit_prompt_mentions_paid_marketing_and_certifications():
 
 
 def test_reddit_user_message_has_subreddit():
-    msg = review.user_message({"text": "hi", "src": "reddit", "sub": "marketing"})
+    msg = review.user_message({"text": "hi", "sub": "marketing"}, "reddit")
     assert msg == "<subreddit>r/marketing</subreddit>\n<comment>\nhi\n</comment>"
 
 
@@ -62,3 +62,20 @@ def test_reddit_recheck_covers_paid_host_recommendations():
     assert review.needs_recheck(row, item, "reddit", "s")
     assert not review.needs_recheck(row, item, "hn", "s")
     assert not review.needs_recheck(row, {"id": "a", "links": ["https://example.com"]}, "reddit", "s")
+
+
+def test_review_passes_source_prompt_and_message(monkeypatch):
+    calls = []
+
+    def fake(key, model, system, user, schema):
+        calls.append((system, user))
+        return {"recommends_course": False}, 0.0
+
+    monkeypatch.setattr(review, "structured", fake)
+    verdict, _ = review.review({"id": "1", "text": "hi"}, "k")
+    assert calls[-1] == (HN_SYSTEM, "<comment>\nhi\n</comment>")
+    assert verdict["id"] == "1" and verdict["model"] == review.MODEL
+    review.review({"id": "t1_a", "text": "hi", "sub": "marketing"}, "k", "m", "reddit")
+    assert calls[-1] == (review.system_prompt("reddit"),
+                         "<subreddit>r/marketing</subreddit>\n<comment>\nhi\n</comment>")
+    assert calls[-1][0].startswith("You review Reddit comments")
