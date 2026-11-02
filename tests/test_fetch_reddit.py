@@ -69,3 +69,19 @@ def test_until_excludes_newer_and_rerun_does_not_duplicate(tmp_path, monkeypatch
     fake = run(tmp_path, monkeypatch, "--since", "2023-01-01")
     fake = run(tmp_path, monkeypatch, "--since", "2023-01-01")
     assert len(fake.candidates.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_rerun_backfills_titles_when_submissions_file_arrives(tmp_path, monkeypatch, capsys):
+    raw = tmp_path / "raw"
+    write_zst(raw / "learnprogramming_comments.zst", [comment("a", "Highly recommend the Coursera course")])
+    fake = sources.Paths(*(tmp_path / n for n in ("c.jsonl", "p.json", "l.jsonl", "co.json", "t.json", "s.jsonl")))
+    monkeypatch.setattr(fetch_reddit, "paths", lambda s: fake)
+    monkeypatch.setattr(sys, "argv", ["fetch_reddit.py", "--raw", str(raw)])
+    fetch_reddit.main()
+    assert "WARNING learnprogramming: no submissions file" in capsys.readouterr().out
+    assert json.loads(fake.threads.read_text(encoding="utf-8")) == {"t1_a": ["t3_xyz", ""]}
+    write_zst(raw / "learnprogramming_submissions.zst", [
+        json.dumps({"id": "xyz", "title": "Best SEO course?", "subreddit": "learnprogramming", "created_utc": T})])
+    fetch_reddit.main()
+    assert json.loads(fake.threads.read_text(encoding="utf-8")) == {"t1_a": ["t3_xyz", "Best SEO course?"]}
+    assert len(fake.candidates.read_text(encoding="utf-8").splitlines()) == 1

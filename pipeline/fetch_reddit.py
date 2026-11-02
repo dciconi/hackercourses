@@ -49,11 +49,11 @@ def _epoch(day: str | None) -> float | None:
     return datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()
 
 
-def existing_ids(path: Path) -> set[str]:
+def existing_rows(path: Path) -> dict[str, dict]:
     if not path.exists():
-        return set()
+        return {}
     with path.open(encoding="utf-8") as f:
-        return {json.loads(line)["id"] for line in f if line.strip()}
+        return {r["id"]: r for r in map(json.loads, filter(str.strip, f))}
 
 
 def main():
@@ -66,7 +66,8 @@ def main():
 
     p = paths("reddit")
     p.candidates.parent.mkdir(parents=True, exist_ok=True)
-    seen = existing_ids(p.candidates)
+    rows = existing_rows(p.candidates)
+    seen = set(rows)
     threads = json.loads(p.threads.read_text(encoding="utf-8")) if p.threads.exists() else {}
 
     with p.candidates.open("a", encoding="utf-8") as out:
@@ -75,7 +76,10 @@ def main():
             if not comments.exists():
                 print(f"{sub}: no comments file, skipped", flush=True)
                 continue
-            total, kept, thread_of = 0, 0, {}
+            total, kept = 0, 0
+            # Every candidate of this subreddit (old or new) still lacking a thread title is backfilled.
+            thread_of = {cid: r["thread"] for cid, r in rows.items()
+                         if r.get("sub", "").lower() == sub.lower() and not (threads.get(cid) or ["", ""])[1]}
             for raw in read_dump(comments):
                 total += 1
                 t = raw.get("created_utc")
@@ -91,10 +95,13 @@ def main():
                 seen.add(c["id"])
                 out.write(json.dumps(c, ensure_ascii=False) + "\n")
                 thread_of[c["id"]] = c["thread"]
+                rows[c["id"]] = c
                 kept += 1
             out.flush()
             titles = {}
             wanted = set(thread_of.values())
+            if wanted and not subs.exists():
+                print(f"WARNING {sub}: no submissions file, thread titles left empty until it is added", flush=True)
             if wanted and subs.exists():
                 for post in read_dump(subs):
                     if f"t3_{post.get('id')}" in wanted:
