@@ -50,14 +50,22 @@ def upvote_factor(ups, age):
 def author_votes(endorsements):
     """endorsements: [{author, thread, time, stance, factor?}] -> one strongest vote per author.
 
-    "sw" is the stance weight, "w" the vote (stance weight x optional upvote factor)."""
+    "w" is the vote (stance weight x optional upvote factor) of the author's strongest weighted
+    comment, which also supplies thread and time; "sw" is the author's strongest stance weight
+    across all their comments."""
     best = {}
     for e in endorsements:
         sw = STANCE_WEIGHT[e["stance"]]
-        f = e.get("factor", 1.0)
+        w = sw * e.get("factor", 1.0)
         cur = best.get(e["author"])
-        if cur is None or (sw, f) > (cur["sw"], cur["factor"]):
-            best[e["author"]] = {**e, "sw": sw, "factor": f, "w": sw * f}
+        if cur is None:
+            best[e["author"]] = {**e, "sw": sw, "w": w}
+            continue
+        top_sw = max(sw, cur["sw"])
+        if w > cur["w"]:
+            best[e["author"]] = {**e, "sw": top_sw, "w": w}
+        else:
+            cur["sw"] = top_sw
     return list(best.values())
 
 

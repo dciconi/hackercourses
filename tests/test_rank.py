@@ -74,3 +74,18 @@ def test_badge_rules_per_source():
          "strong_share": 0.0, "recent_share": 0.6}
     assert set(rank.BADGE_RULES) == {"hn", "reddit"}
     assert rank.badges(c, 0, 100, 0) == rank.badges(c, 0, 100, 0, source="hn")
+
+
+def test_author_keeps_strongest_weighted_vote_and_strongest_stance():
+    loud = {**e("a", 1, "mentions"), "factor": 2.0}
+    quiet = {**e("a", 2, "recommends"), "factor": 0.5}
+    for order in ([loud, quiet], [quiet, loud]):
+        v = rank.author_votes(order)
+        assert len(v) == 1
+        assert v[0]["w"] == 0.5 and v[0]["sw"] == 0.7 and v[0]["thread"] == 1
+
+
+def test_hn_badge_rules_are_the_original_numbers():
+    assert rank.BADGE_RULES["hn"] == {"classic_span": 8, "evergreen_years": 6, "evergreen_span": 8,
+                                      "rising_min": 3, "rising_share": 0.6, "gem_min": 2,
+                                      "gem_max": 4, "gem_strong": 0.75}
