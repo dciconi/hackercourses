@@ -15,9 +15,15 @@ in how many separate discussions, and for how long:
 
 score = sum over threads of damped votes  x  staying-power multiplier
 
+Reddit comments also carry an upvote factor on their vote, 1 + min(1, log10(ups) / 3): 1 upvote
+counts as 1.0, 1,000 or more as 2.0, a score of 0 or below as 0.5, and a comment captured less than
+30 days after posting is not scaled. The factor scales the vote, never the stance weight. HN
+endorsements have no factor, so HN scores are unchanged.
+
 "Trending" uses the same votes with a 2-year half-life back from the newest comment in the data.
 """
 
+import math
 import time
 from collections import defaultdict
 
@@ -26,15 +32,32 @@ THREAD_DECAY = 0.5
 YEAR_BONUS = 0.08
 HALF_LIFE_YEARS = 2.0
 YEAR = 365.25 * 24 * 3600
+UPVOTE_MIN_AGE = 30 * 24 * 3600
+_HN_RULES = {"classic_span": 8, "evergreen_years": 6, "evergreen_span": 8, "rising_min": 3,
+             "rising_share": 0.6, "gem_min": 2, "gem_max": 4, "gem_strong": 0.75}
+BADGE_RULES = {"hn": dict(_HN_RULES), "reddit": dict(_HN_RULES)}
+
+
+def upvote_factor(ups, age):
+    """Vote multiplier from a comment's upvotes; age = seconds between posting and capture."""
+    if ups is None or age is None or age < UPVOTE_MIN_AGE:
+        return 1.0
+    if ups <= 0:
+        return 0.5
+    return 1 + min(1.0, math.log10(ups) / 3)
 
 
 def author_votes(endorsements):
-    """endorsements: [{author, thread, time, stance}] -> one strongest vote per author."""
+    """endorsements: [{author, thread, time, stance, factor?}] -> one strongest vote per author.
+
+    "sw" is the stance weight, "w" the vote (stance weight x optional upvote factor)."""
     best = {}
     for e in endorsements:
-        w = STANCE_WEIGHT[e["stance"]]
-        if e["author"] not in best or w > best[e["author"]]["w"]:
-            best[e["author"]] = {**e, "w": w}
+        sw = STANCE_WEIGHT[e["stance"]]
+        f = e.get("factor", 1.0)
+        cur = best.get(e["author"])
+        if cur is None or (sw, f) > (cur["sw"], cur["factor"]):
+            best[e["author"]] = {**e, "sw": sw, "factor": f, "w": sw * f}
     return list(best.values())
 
 
@@ -59,17 +82,18 @@ def trending(endorsements, now):
     return damped(votes, lambda v: v["w"] * 0.5 ** ((now - v["time"]) / (HALF_LIFE_YEARS * YEAR)))
 
 
-def badges(course, rank, n_courses, now):
+def badges(course, rank, n_courses, now, source="hn"):
     """course: dict with recommenders, years_active, first, last, strong_share, recent_share."""
+    r = BADGE_RULES[source]
     out = []
     span = time.gmtime(course["last"]).tm_year - time.gmtime(course["first"]).tm_year
-    if rank < max(25, n_courses // 50) and span >= 8:
+    if rank < max(25, n_courses // 50) and span >= r["classic_span"]:
         out.append("classic")
-    if course["years_active"] >= 6 and span >= 8:
+    if course["years_active"] >= r["evergreen_years"] and span >= r["evergreen_span"]:
         out.append("evergreen")
-    if course["recommenders"] >= 3 and course["recent_share"] >= 0.6:
+    if course["recommenders"] >= r["rising_min"] and course["recent_share"] >= r["rising_share"]:
         out.append("rising")
-    if 2 <= course["recommenders"] <= 4 and course["strong_share"] >= 0.75:
+    if r["gem_min"] <= course["recommenders"] <= r["gem_max"] and course["strong_share"] >= r["gem_strong"]:
         out.append("hidden gem")
     return out
 

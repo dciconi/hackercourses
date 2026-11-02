@@ -46,3 +46,31 @@ def test_trending_prefers_recent_votes():
     old = [e("a", 1, t=Y2015)]
     new = [e("a", 1, t=now - YEAR // 2)]
     assert rank.trending(new, now) > 4 * rank.trending(old, now)
+
+
+def test_upvote_factor():
+    D = 86400
+    assert rank.upvote_factor(None, None) == 1.0
+    assert rank.upvote_factor(500, 5 * D) == 1.0          # too young to trust
+    assert rank.upvote_factor(0, 60 * D) == 0.5
+    assert rank.upvote_factor(1, 60 * D) == 1.0
+    assert rank.upvote_factor(1000, 60 * D) == 2.0
+    assert rank.upvote_factor(10**6, 60 * D) == 2.0       # capped
+
+
+def test_factor_scales_vote_but_not_stance_weight():
+    v = rank.author_votes([{**e("a", 1), "factor": 2.0}])[0]
+    assert v["w"] == 1.4 and v["sw"] == 0.7
+
+
+def test_factor_applies_to_trending_and_hn_unchanged():
+    now = Y2015
+    assert rank.trending([{**e("a", 1), "factor": 2.0}], now) == 2 * rank.trending([e("a", 1)], now)
+    assert rank.score([{**e("a", 1), "factor": 0.5}]) == 0.5 * rank.score([e("a", 1)])
+
+
+def test_badge_rules_per_source():
+    c = {"recommenders": 3, "years_active": 6, "first": 1_300_000_000, "last": 1_700_000_000,
+         "strong_share": 0.0, "recent_share": 0.6}
+    assert set(rank.BADGE_RULES) == {"hn", "reddit"}
+    assert rank.badges(c, 0, 100, 0) == rank.badges(c, 0, 100, 0, source="hn")
