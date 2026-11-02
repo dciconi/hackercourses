@@ -3,6 +3,7 @@
   "use strict";
 
   const DATA = window.HACKER_COURSES || { topics: [], courses: [], comments: 0 };
+  const SOURCE = DATA.source === "reddit" ? "reddit" : "hn";
   const PAGE = 60;
   const ALL = "";
   const BADGE = { classic: ["Classic", "classic"], evergreen: ["Evergreen", "evergreen"],
@@ -90,6 +91,7 @@
   // and course pages can step through this list with ← →.
   function remember(activeSlug) {
     HC.store("hc.grid", {
+      source: SOURCE,
       view: state.view, sort: state.sort, query: state.query,
       ...Object.fromEntries(FILTERS.map((f) => [f, state[f]])),
       slugs: state.list.map((c) => c.slug), names: state.list.map((c) => c.name),
@@ -394,12 +396,16 @@
 
   // ---- boot -------------------------------------------------------------------------
 
-  $("summary").textContent =
-    `${DATA.courses.length.toLocaleString()} courses programmers keep recommending, ranked from ` +
-    `${DATA.comments.toLocaleString()} comments, 2006–${year(DATA.dataEnd)}.`;
+  $("summary").textContent = SOURCE === "reddit"
+    ? `${DATA.courses.length.toLocaleString()} courses Redditors keep recommending, ranked from ` +
+      `${DATA.comments.toLocaleString()} comments, ${DATA.dataStart ? `${year(DATA.dataStart)}–` : ""}${year(DATA.dataEnd)}.`
+    : `${DATA.courses.length.toLocaleString()} courses programmers keep recommending, ranked from ` +
+      `${DATA.comments.toLocaleString()} comments, 2006–${year(DATA.dataEnd)}.`;
 
   const params = new URLSearchParams(location.search);
-  const back = HC.load("hc.grid", null, "session");
+  const lastGrid = HC.load("hc.grid", null, "session");
+  // Another source's list (different slugs) must not be restored here.
+  const back = lastGrid && (lastGrid.source || "hn") === SOURCE ? lastGrid : null;
   if (params.has("q")) {
     state.query = params.get("q").trim();
   } else if (back) {

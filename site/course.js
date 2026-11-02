@@ -40,9 +40,12 @@
 
   function backToGrid() {
     if (grid) { grid.active = slug; HC.store("hc.grid", grid, "session"); }
-    const fromGrid = document.referrer && new URL(document.referrer).origin === location.origin &&
-      new URL(document.referrer).pathname === "/";
-    if (fromGrid && history.length > 1) history.back(); else location.href = "/";
+    // The grid the visitor came from; else the home the page's own back link names ("/" or "/reddit/").
+    const home = grid?.source === "reddit" ? "/reddit/" : grid?.source === "hn" ? "/"
+      : document.getElementById("backLink").getAttribute("href");
+    const ref = document.referrer && new URL(document.referrer);
+    const fromGrid = ref && ref.origin === location.origin && (ref.pathname === "/" || ref.pathname === "/reddit/");
+    if (fromGrid && history.length > 1) history.back(); else location.href = home;
   }
   document.getElementById("backLink").addEventListener("click", (e) => { e.preventDefault(); backToGrid(); });
 
