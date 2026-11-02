@@ -76,12 +76,11 @@ def main():
             if not comments.exists():
                 print(f"{sub}: no comments file, skipped", flush=True)
                 continue
-            total, kept = 0, 0
+            in_window, new, had = 0, 0, 0
             # Every candidate of this subreddit (old or new) still lacking a thread title is backfilled.
             thread_of = {cid: r["thread"] for cid, r in rows.items()
                          if r.get("sub", "").lower() == sub.lower() and not (threads.get(cid) or ["", ""])[1]}
             for raw in read_dump(comments):
-                total += 1
                 t = raw.get("created_utc")
                 try:
                     t = int(t)
@@ -89,14 +88,18 @@ def main():
                     continue
                 if (since is not None and t < since) or (until is not None and t >= until):
                     continue
+                in_window += 1
                 c = candidate(raw)
-                if c is None or c["id"] in seen:
+                if c is None:
+                    continue
+                if c["id"] in seen:
+                    had += 1
                     continue
                 seen.add(c["id"])
                 out.write(json.dumps(c, ensure_ascii=False) + "\n")
                 thread_of[c["id"]] = c["thread"]
                 rows[c["id"]] = c
-                kept += 1
+                new += 1
             out.flush()
             titles = {}
             wanted = set(thread_of.values())
@@ -109,7 +112,8 @@ def main():
             for cid, tid in thread_of.items():
                 threads[cid] = [tid, titles.get(tid, "")]
             p.threads.write_text(json.dumps(threads, ensure_ascii=False), encoding="utf-8")
-            print(f"{sub}: kept {kept}/{total}", flush=True)
+            # in-window: dump rows in the date range; new / already had: candidates among them.
+            print(f"{sub}: {in_window} in-window, {new} new, {had} already had", flush=True)
 
 
 if __name__ == "__main__":

@@ -146,6 +146,13 @@ def load(source):
     return done
 
 
+def listable_on_reddit(items):
+    """A Reddit course is only listed with enough distinct recommenders (build.py), so a course
+    with fewer distinct Reddit authors is not worth a summary."""
+    from build import REDDIT_MIN_RECOMMENDERS  # build imports this module, so import late
+    return len({it["by"] for it in items if it["src"] == "reddit"}) >= REDDIT_MIN_RECOMMENDERS
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", choices=sources.SOURCES, default="hn")
@@ -156,6 +163,8 @@ def main():
     threads = json.loads(p.threads.read_text(encoding="utf-8")) if p.threads.exists() else {}
     cat, by_course = course_comments(args.source)
     done = load(args.source)
+    if args.source == "reddit":
+        by_course = {cid: items for cid, items in by_course.items() if listable_on_reddit(items)}
     # New courses, plus courses whose comments changed since they were summarized.
     todo = sorted((cid for cid in by_course
                    if cid not in done or not chosen_ids(by_course[cid]) <= covered(done[cid])),

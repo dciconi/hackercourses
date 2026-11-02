@@ -85,3 +85,10 @@ def test_rerun_backfills_titles_when_submissions_file_arrives(tmp_path, monkeypa
     fetch_reddit.main()
     assert json.loads(fake.threads.read_text(encoding="utf-8")) == {"t1_a": ["t3_xyz", "Best SEO course?"]}
     assert len(fake.candidates.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_per_subreddit_counts(tmp_path, monkeypatch, capsys):
+    run(tmp_path, monkeypatch, "--since", "2023-01-01")
+    assert "learnprogramming: 2 in-window, 1 new, 0 already had" in capsys.readouterr().out
+    run(tmp_path, monkeypatch, "--since", "2023-01-01")
+    assert "learnprogramming: 2 in-window, 0 new, 1 already had" in capsys.readouterr().out

@@ -65,9 +65,21 @@ uv run pytest -q tests
 uv run python pipeline/serve.py 8765   # preview the committed site
 ```
 
-The Reddit list runs the same steps with `--source reddit` (`classify`, `review`, `canonicalize`,
-`summarize`), after `uv run python pipeline/fetch_reddit.py --raw <folder of dump files>`. `build.py`
-renders both lists, and the Reddit pages exist only once Reddit data does.
+The Reddit list runs the same steps with `--source reddit`, in this order:
+
+```bash
+uv run python pipeline/fetch_reddit.py --raw <folder of dump files>
+uv run python pipeline/classify.py --source reddit
+uv run python pipeline/review.py --source reddit
+uv run python pipeline/review.py --source reddit --recheck-spam
+uv run python pipeline/classify.py --source reddit
+uv run python pipeline/canonicalize.py --source reddit
+uv run python pipeline/canonicalize.py --dedupe-reddit
+uv run python pipeline/summarize.py --source reddit
+uv run python pipeline/build.py
+```
+
+`build.py` renders both lists, and the Reddit pages exist only once Reddit data does.
 
 The pipeline lives in `pipeline/`, one script per step, from `fetch.py` to `build.py`. Every step is
 resumable and only processes what is new.

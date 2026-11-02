@@ -22,7 +22,9 @@ def setup(tmp_path, monkeypatch):
     cat.write_text(json.dumps(CAT), encoding="utf-8")
     monkeypatch.setattr(summarize, "CATALOG", cat)
     hn = [{"id": 42, "text": "CS50 is great", "links": [], "courses": [{"name": "CS50", "provider": "Harvard"}]}]
-    rd = [{"id": "t1_abc", "src": "reddit", "sub": "learnprogramming", "text": "CS50 changed my life",
+    rd = [{"id": "t1_abc", "src": "reddit", "sub": "learnprogramming", "by": "u1", "text": "CS50 changed my life",
+           "links": [], "courses": [{"name": "CS50", "provider": "Harvard"}]},
+          {"id": "t1_def", "src": "reddit", "sub": "learnprogramming", "by": "u2", "text": "CS50 too",
            "links": [], "courses": [{"name": "CS50", "provider": "Harvard"}]}]
     sources.paths("hn").courses.write_text(json.dumps(hn), encoding="utf-8")
     sources.paths("reddit").courses.write_text(json.dumps(rd), encoding="utf-8")
@@ -33,11 +35,11 @@ def setup(tmp_path, monkeypatch):
 def test_course_comments_tags_sources_and_keeps_ids_distinct(tmp_path, monkeypatch):
     setup(tmp_path, monkeypatch)
     _, both = summarize.course_comments()
-    assert {(it["src"], it["id"]) for it in both[0]} == {("hn", 42), ("reddit", "t1_abc")}
+    assert {(it["src"], it["id"]) for it in both[0]} == {("hn", 42), ("reddit", "t1_abc"), ("reddit", "t1_def")}
     _, hn = summarize.course_comments("hn")
     assert [it["id"] for it in hn[0]] == [42]
     _, rd = summarize.course_comments("reddit")
-    assert [it["id"] for it in rd[0]] == ["t1_abc"]
+    assert [it["id"] for it in rd[0]] == ["t1_abc", "t1_def"]
 
 
 def test_reddit_run_never_writes_hn_summaries(tmp_path, monkeypatch):
@@ -61,7 +63,7 @@ def test_reddit_run_never_writes_hn_summaries(tmp_path, monkeypatch):
     assert hn_file.read_bytes() == before
     lines = [json.loads(x) for x in sources.paths("reddit").summaries.read_text(encoding="utf-8").splitlines()]
     assert lines[0]["stances"] == {"t1_abc": "strongly_recommends"}
-    assert lines[0]["comment_ids"] == ["t1_abc"]
+    assert lines[0]["comment_ids"] == ["t1_abc", "t1_def"]
     assert 'thread="Best CS course?"' in prompts[0] and "CS50 is great" not in prompts[0]
     assert summarize.load("reddit")[0]["stances"] == {"t1_abc": "strongly_recommends"}
     assert summarize.load("hn")[0]["comment_ids"] == [42]
@@ -83,3 +85,29 @@ def test_covered_and_chosen_ids_with_reddit_ids():
     assert summarize.covered({"stances": {"42": "x", "t1_abc": "y"}}) == {42, "t1_abc"}
     assert summarize.covered({"comment_ids": ["t1_abc"], "stances": {}}) == {"t1_abc"}
     assert summarize.chosen_ids([{"id": "t1_a", "text": "xx"}, {"id": "t1_b", "text": "y"}]) == {"t1_a", "t1_b"}
+
+
+def test_reddit_run_skips_courses_that_cannot_be_listed(tmp_path, monkeypatch):
+    import build
+    setup(tmp_path, monkeypatch)
+    cat = {"courses": [{"id": 0, "name": "CS50", "provider": "Harvard"}, {"id": 1, "name": "Solo", "provider": "X"}],
+           "aliases": {"CS50|Harvard": 0, "Solo|X": 1}}
+    summarize.CATALOG.write_text(json.dumps(cat), encoding="utf-8")
+    rd = json.loads(sources.paths("reddit").courses.read_text(encoding="utf-8"))
+    solo = {"links": [], "src": "reddit", "sub": "s", "courses": [{"name": "Solo", "provider": "X"}]}
+    rd += [solo | {"id": "t1_s1", "by": "u9", "text": "Solo is good"},
+           solo | {"id": "t1_s2", "by": "u9", "text": "Solo again"}]  # one author twice: one recommender
+    sources.paths("reddit").courses.write_text(json.dumps(rd), encoding="utf-8")
+    seen = []
+
+    def fake_structured(key, model, system, user, schema, max_tokens=0):
+        seen.append(user.splitlines()[0])
+        return {"summary": "x", "why": "y", "level": "unknown", "cost": "free", "format": "mixed", "tags": [],
+                "url_index": None, "topic": "other", "stances": []}, 0.0
+
+    monkeypatch.setattr(summarize, "structured", fake_structured)
+    monkeypatch.setattr(summarize, "api_key", lambda: "k")
+    monkeypatch.setattr(sys, "argv", ["summarize.py", "--source", "reddit"])
+    assert build.REDDIT_MIN_RECOMMENDERS == 2
+    summarize.main()
+    assert seen == ["Course: CS50"]
