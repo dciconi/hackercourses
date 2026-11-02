@@ -13,7 +13,7 @@ REDDIT_HOSTS = (
     "domestika.org", "reforge.com",
 )
 REDDIT_NAMED = (
-    r"hubspot academy|google skillshop|digital garage|google (ads|analytics) certification|maven|"
+    r"hubspot academy|google skillshop|digital garage|google (ads|analytics) certification|maven\.com|maven (course|cohort)s?|"
     r"reforge|skillshare|domestika|building a second brain|startup school|linkedin learning|masterclass"
 )
 REDDIT_SPAM = re.compile(

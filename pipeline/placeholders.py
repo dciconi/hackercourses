@@ -128,6 +128,22 @@ def bulb():
             + path("M300 205 L320 175 L340 205", stroke=ACCENT, w=5))
 
 
+def target():
+    """Productivity: concentric rings with an arrow in the bullseye and a check mark."""
+    return (circle(300, 185, 100) + circle(300, 185, 62, w=5) + circle(300, 185, 24, fill=ACCENT, stroke=ACCENT)
+            + line(300, 185, 430, 75, color=ACCENT, w=7) + path("M405 70 L436 69 L435 100", stroke=ACCENT, w=6)
+            + path("M440 235 L462 258 L505 205", w=7))
+
+
+def megaphone():
+    """Marketing: a megaphone with sound waves and a rising growth arrow."""
+    return (path("M200 160 L330 100 V 260 L200 200 Z") + rect(165, 155, 40, 50, r=8)
+            + path("M225 205 L240 262 H 270 L 258 232")
+            + path("M370 150 C 395 170, 395 190, 370 210", stroke=ACCENT, w=6)
+            + path("M405 125 C 450 165, 450 195, 405 235", stroke=ACCENT, w=6)
+            + path("M440 105 L495 60", stroke=ACCENT, w=6) + path("M470 58 L497 58 L497 85", stroke=ACCENT, w=6))
+
+
 MOTIFS = {
     "Machine Learning & AI": (neural, "#2b2350", "#3f3070"),
     "Algorithms & Data Structures": (tree, "#123a3a", "#1d5656"),
@@ -138,6 +154,8 @@ MOTIFS = {
     "Databases & Data Engineering": (database, "#33203a", "#4d3058"),
     "Security & Cryptography": (lock, "#2a1a1a", "#4a2a2c"),
     "Science & Engineering": (atom, "#102d40", "#184864"),
+    "Productivity & Personal Development": (target, "#14313a", "#1f4d5a"),
+    "Marketing & Growth": (megaphone, "#3a1f14", "#5d3320"),
     "Business, Finance & Economics": (chart, "#2f2d14", "#4b4721"),
     "Design & Creative": (bezier, "#3d1d30", "#5d2d4a"),
     "Humanities & Social Science": (book, "#34281c", "#503d29"),

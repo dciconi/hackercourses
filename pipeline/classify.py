@@ -5,15 +5,17 @@ Reads data/candidates.jsonl, writes data/pool.json and data/courses.json
 (applying data/llm_labels.jsonl from review.py when present).
 """
 
+import argparse
 import html
 import json
 import re
-import sys
 from collections import Counter, defaultdict
+from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 from urllib.parse import urlparse
 
+import reddit
 import sources
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -99,6 +101,8 @@ NAMED_COURSE = re.compile(
     r"[\"“][^\"”\n]{4,80}[\"”] (?i:" + COURSE_WORD + r")",  # the "Learning How to Learn" course
 )
 
+REDDIT_NAMED_RX = re.compile(r"(?i:\b(" + reddit.REDDIT_NAMED + r")\b)")
+
 # --- spam -------------------------------------------------------------------
 
 SPAM = re.compile(
@@ -138,9 +142,14 @@ TOPICS = [
     ("Science & Engineering", r"physics|chemistry|biology|neuroscience|electr(on)?ic|circuits|"
      r"signal processing|control theory|robotics|quantum|astronomy|genetics|mechanical|"
      r"6\.002|6\.003|embedded|fpga|verilog|hardware design|medicine|anatomy"),
+    ("Productivity & Personal Development", r"productivity|habit|procrastinat|time management|discipline|focus|"
+     r"note[- ]taking|second brain|\bpkm|zettelkasten|obsidian|notion|journaling|bujo|self[- ]improvement|"
+     r"personal development|deep work"),
+    ("Marketing & Growth", r"marketing|\bseo\b|\bppc\b|google ads|facebook ads|meta ads|copywriting|"
+     r"email (marketing|campaign)|growth|social media|content strategy|brand|funnel|conversion"),
     ("Business, Finance & Economics", r"econom|finance|financial|accounting|startup|entrepreneur|"
-     r"marketing|business|management|negotiation|investing|valuation|venture|game theory|"
-     r"how to start a startup|strategy|sales\b"),
+     r"business|management|negotiation|investing|valuation|venture|game theory|"
+     r"how to start a startup|strategy"),
     ("Design & Creative", r"\bdesign|drawing|music|guitar|piano|photograph|writing|film|"
      r"animation|typography|\bux\b|\bui\b|art history|painting|game dev|creative"),
     ("Humanities & Social Science", r"philosoph|history|psycholog|sociolog|literature|"
@@ -163,16 +172,16 @@ COURSE_WORD_RX = re.compile(COURSE_WORD, re.I)
 SENTENCES = re.compile(r"(?<=[.!?])\s+|\n+")
 
 
-def course_links(links):
+def course_links(links, hosts=COURSE_HOSTS):
     out = []
     for u in links:
         low = u.lower()
-        if any(h in low for h in COURSE_HOSTS) or EDU_COURSE_PATH.search(low):
+        if any(h in low for h in hosts) or EDU_COURSE_PATH.search(low):
             out.append(u)
     return list(dict.fromkeys(out))[:5]
 
 
-def recommends_course(scrubbed):
+def recommends_course(scrubbed, hosts=COURSE_HOSTS, named=(NAMED_COURSE,)):
     """A recommendation and a specific course must sit in the same or adjacent sentences."""
     sents = [s for s in SENTENCES.split(scrubbed) if s.strip()]
     for i in range(len(sents)):
@@ -180,51 +189,57 @@ def recommends_course(scrubbed):
         if not RECOMMEND.search(sents[i]) and not RECOMMEND.search(window):
             continue
         low = window.lower()
-        course_url = any(h in low for h in COURSE_HOSTS) or EDU_COURSE_PATH.search(low)
-        if (COURSE_WORD_RX.search(window) or course_url) and (NAMED_COURSE.search(window) or course_url):
+        course_url = any(h in low for h in hosts) or EDU_COURSE_PATH.search(low)
+        if (COURSE_WORD_RX.search(window) or course_url) and (any(n.search(window) for n in named) or course_url):
             return True
     return False
 
 
-def classify(row):
-    text, links = to_text(row["text"])
+def classify(row, source="hn"):
+    is_reddit = source == "reddit"
+    text, links = reddit.to_text(row["text"]) if is_reddit else to_text(row["text"])
+    spam = (SPAM, reddit.REDDIT_SPAM) if is_reddit else (SPAM,)
+    hosts = COURSE_HOSTS + reddit.REDDIT_HOSTS if is_reddit else COURSE_HOSTS
+    named = (NAMED_COURSE, REDDIT_NAMED_RX) if is_reddit else (NAMED_COURSE,)
     if len(text) < 40 or len(text) > 6000:
         return None, "length"
-    if SPAM.search(row["text"]):
+    if any(rx.search(row["text"]) for rx in spam):
         return None, "spam"
     # Judge only the author's own words, not what they are quoting.
     own = QUOTE.sub("\n", text)
     scrubbed = NOT_A_COURSE.sub(" ", own)
-    clinks = course_links(links)
+    clinks = course_links(links, hosts)
     if not COURSE_WORD_RX.search(scrubbed) and not clinks:
         return None, "not-a-course"
     if NEGATIVE.search(scrubbed):
         return None, "negative"
-    if not recommends_course(scrubbed):
+    if not recommends_course(scrubbed, hosts, named):
         return None, "no-recommendation"
-    score = confidence(scrubbed, clinks)
-    return {
+    item = {
         "id": row["id"],
         "by": row["by"],
         "time": row["time"],
         "text": text,
         "links": clinks,
         "topic": topic_of(own, clinks),
-        "score": score,
-    }, "kept"
+        "score": confidence(scrubbed, clinks, named),
+    }
+    if is_reddit:
+        item.update({k: row.get(k) for k in ("src", "sub", "ups", "age", "thread")})
+    return item, "kept"
 
 
-def confidence(scrubbed, clinks):
+def confidence(scrubbed, clinks, named=(NAMED_COURSE,)):
     """0-5, used for ordering: explicit endorsement of a linked, named course ranks first."""
     s = 0
     s += 2 if re.search(r"\b(highly|strongly|definitely) recommend|\brecommend\b", scrubbed, re.I) else 0
     s += 1 if re.search(PRAISE, scrubbed, re.I) else 0
     s += 1 if clinks else 0
-    s += 1 if NAMED_COURSE.search(scrubbed) else 0
+    s += 1 if any(n.search(scrubbed) for n in named) else 0
     return s
 
 
-def apply_labels(pool, reasons):
+def apply_labels(pool, reasons, LABELS=LABELS):
     """Second pass from review.py: the model's verdict decides inclusion, topic and course names."""
     labels = {}
     with LABELS.open(encoding="utf-8") as f:
@@ -251,20 +266,26 @@ def apply_labels(pool, reasons):
     return out
 
 
-def classify_line(line):
+def classify_line(line, source="hn"):
     row = json.loads(line)
     if not row.get("text") or not row.get("by"):
         return None, "empty"
-    return classify(row)
+    return classify(row, source)
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--source", choices=sources.SOURCES, default="hn")
+    ap.add_argument("candidates", nargs="?", type=Path, help="override the candidates file")
+    args = ap.parse_args()
+    p = sources.paths(args.source)
+    POOL, LABELS, OUT_JSON = p.pool, p.labels, p.courses
+    src = args.candidates or p.candidates
     reasons = Counter()
     kept = []
     seen_text = set()
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else SRC
     with src.open(encoding="utf-8") as f, Pool() as pool:
-        for item, why in pool.imap(classify_line, f, chunksize=2000):
+        for item, why in pool.imap(partial(classify_line, source=args.source), f, chunksize=2000):
             reasons[why] += 1
             if not item:
                 continue
@@ -289,7 +310,7 @@ def main():
     reasons["rule-pool"] = len(kept)
     del reasons["kept"]
 
-    kept = apply_labels(kept, reasons) if LABELS.exists() else [it for it in kept if it["score"] >= 2]
+    kept = apply_labels(kept, reasons, LABELS) if LABELS.exists() else [it for it in kept if it["score"] >= 2]
     reasons["kept"] = len(kept)
     kept.sort(key=lambda it: (-it["score"], -it["time"]))
     by_topic = defaultdict(int)
