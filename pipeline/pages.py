@@ -137,7 +137,7 @@ def footer():
   <a href="https://huggingface.co/datasets/open-index/hacker-news">open-index/hacker-news</a> (ODC-By) datasets and the
   <a href="https://hn.algolia.com/api">HN Search API</a>.
   Each comment belongs to its author; course images belong to the course providers.
-  Want a comment removed? <a href="{REPO}/issues/new?title=Removal%20request&amp;labels=removal">Open a removal request</a>.
+  Want a comment removed? <a href="{REPO}/issues/new?template=removal.yml">Open a removal request</a>.
   <a href="/about/">About</a> · <a href="{REPO}">Source</a>.
   Not affiliated with Y Combinator or Hacker News.
 </footer>"""
@@ -332,7 +332,7 @@ def about_page(meta):
   doesn't use cookies or fingerprinting and doesn't follow you to other sites. Saved courses and your
   theme are kept in your own browser.
   Each comment belongs to its author and links back to the original. To have a comment removed,
-  <a href="{REPO}/issues/new?title=Removal%20request&amp;labels=removal">open a removal request</a>.</p>
+  <a href="{REPO}/issues/new?template=removal.yml">open a removal request</a>.</p>
 </main>
 """
             + end([]))

@@ -21,7 +21,7 @@ Credit "Hacker Courses (hackercourses.com)" with a link.
 - **Hacker News comments.** Comment text quoted in `site/course/*/index.html` remains the property of
   its authors and is not covered by either license above. It is shown with attribution and a link to
   the original. Authors can ask for removal by
-  [opening an issue](https://github.com/dciconi/hackercourses/issues/new?title=Removal%20request&labels=removal).
+  [opening an issue](https://github.com/dciconi/hackercourses/issues/new?template=removal.yml).
 - **Source datasets.** Comments were obtained from `nixiesearch/hackernews-comments` (Apache-2.0) and
   `open-index/hacker-news` (ODC-By 1.0), plus the HN Search API by Algolia; see [`NOTICE`](NOTICE).
 - **Course images.** Preview images are loaded from each course provider's own site and are not stored

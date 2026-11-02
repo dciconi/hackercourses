@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 
 import pages
 import rank
+import removals
 from classify import OTHER, ROOT, TOPICS
 from images import OUT as IMAGES
 from summarize import SUMMARIES, THREADS, course_comments
@@ -23,6 +24,12 @@ GRID_FIELDS = ("id", "slug", "name", "provider", "topic", "summary", "why", "lev
 
 def main():
     cat, by_course = course_comments()
+    # Honor removal requests before anything is ranked or published.
+    ids, users = removals.load()
+    by_course = {cid: kept for cid, items in by_course.items()
+                 if (kept := [it for it in items if not removals.removed(it, ids, users)])}
+    if ids or users:
+        print(f"removals: {len(ids)} comment ids, {len(users)} users")
     threads = json.loads(THREADS.read_text(encoding="utf-8"))
     summaries = {}
     if SUMMARIES.exists():

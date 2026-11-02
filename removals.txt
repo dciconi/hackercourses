@@ -1,0 +1,7 @@
+# Comments removed at their authors' request. build.py skips these on every build.
+#
+# One entry per line:
+#   41709040    an HN comment id (the number in news.ycombinator.com/item?id=...)
+#   user:name   every comment by that HN username
+# Add a note after a hash, e.g. the date and issue number:
+#   41709040    # 2026-11-03, issue #12

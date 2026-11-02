@@ -160,7 +160,14 @@ registered at Namecheap and uses Cloudflare's nameservers.
 ## Contributing and removal requests
 
 Issues and pull requests are welcome. If you wrote a comment quoted on the site and want it removed,
-[open a removal request](https://github.com/dciconi/hackercourses/issues/new?title=Removal%20request&labels=removal).
+[open a removal request](https://github.com/dciconi/hackercourses/issues/new?template=removal.yml);
+the form applies the `removal` label.
+
+To handle one: add the comment id (or `user:<hn-username>` for everything by someone) to
+[`removals.txt`](removals.txt), run `uv run python pipeline/build.py`, commit and push. The comment
+disappears on the next deploy, and since `build.py` always skips that list, later data refreshes can't
+bring it back. A course whose only recommendation is removed drops off the site. Course summaries are
+paraphrases written before the removal and aren't regenerated automatically.
 
 ## License
 
