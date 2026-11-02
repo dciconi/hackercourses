@@ -28,7 +28,39 @@ REPO = "https://github.com/dciconi/hackercourses"
 STANCE = ["Criticizes", "Mentions", "Recommends", "Strongly recommends"]
 BADGE = {"classic": ("Classic", "classic"), "evergreen": ("Evergreen", "evergreen"),
          "rising": ("Rising", "rising"), "hidden gem": ("Hidden gem", "gem")}
-TOPIC_PAGES = []  # [(topic, slug, course count)], filled by write_all() for the footer
+TOPIC_PAGES = {"hn": [], "reddit": []}  # source -> [(topic, slug, course count)], filled by write_all() for the footer
+SOURCE_NAMES = {"hn": "Hacker News", "reddit": "Reddit"}
+REDDIT_COMMUNITIES = 30
+
+
+def home(source):
+    return "/reddit/" if source == "reddit" else "/"
+
+
+def topic_url(source, slug):
+    return f"{home(source)}topic/{slug}/"
+
+
+def tagline(source, comments=0):
+    if source == "reddit":
+        return (f"The online courses Redditors keep recommending, ranked from {comments:,} public comments "
+                f"in {REDDIT_COMMUNITIES} communities.")
+    return TAGLINE
+
+
+def source_switch(source, links=None):
+    """The Hacker News | Reddit control. links maps a source to its href (default: its home page)."""
+    links = links or {}
+    items = ""
+    for s, name in SOURCE_NAMES.items():
+        current = ' aria-current="page"' if s == source else ""
+        items += f'<a href="{links.get(s, home(s))}" data-source="{s}"{current}>{name}</a>'
+    return f'<nav class="source-switch" aria-label="Source">{items}</nav>'
+
+
+def has_switch(meta, source):
+    """The switch only exists once there are Reddit courses, so nothing ever links to a missing /reddit/."""
+    return source == "reddit" or bool(meta.get("reddit"))
 
 
 def e(text):
@@ -101,17 +133,17 @@ def head(title, description, path, image, kind="website", extra="", index=True):
 <body>"""
 
 
-def header(query=""):
+def header(query="", source="hn", tag=None):
     return f"""<a class="skip" href="#main">Skip to content</a>
 <header class="top">
   <a class="brand" href="/" aria-label="{NAME}, home">
     <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M9 10h14M9 16h10M9 22h6"/></svg>
     <span>
       <span class="name">{NAME}</span>
-      <span class="sub" id="summary">{e(TAGLINE)}</span>
+      <span class="sub" id="summary">{e(tag or TAGLINE)}</span>
     </span>
   </a>
-  <form class="search" action="/" method="get" role="search">
+  <form class="search" action="{home(source)}" method="get" role="search">
     <label for="q" class="visually-hidden">Search courses</label>
     <input id="q" name="q" type="search" value="{e(query)}" placeholder="Search courses, instructors, topics" autocomplete="off">
     <kbd aria-hidden="true">/</kbd>
@@ -149,7 +181,16 @@ HELP = """<dialog id="help" aria-labelledby="hTitle">
 </dialog>"""
 
 
-def footer():
+def footer(source="hn"):
+    if source == "reddit":
+        return f"""<footer class="foot">
+  Built from public Reddit comments in {REDDIT_COMMUNITIES} communities, via a public archive of Reddit comment dumps.
+  Each comment belongs to its author and links back to Reddit; course images belong to the course providers.
+  Want a comment removed? <a href="{REPO}/issues/new?template=removal.yml">Open a removal request</a>.
+  <a href="/about/">About</a> · <a href="{REPO}">Source</a>.
+  Not affiliated with Reddit.
+  {topic_nav(source)}
+</footer>"""
     return f"""<footer class="foot">
   Built from public Hacker News comments, {SPAN}, via the
   <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> (Apache-2.0) and
@@ -159,18 +200,18 @@ def footer():
   Want a comment removed? <a href="{REPO}/issues/new?template=removal.yml">Open a removal request</a>.
   <a href="/about/">About</a> · <a href="{REPO}">Source</a>.
   Not affiliated with Y Combinator or Hacker News.
-  {topic_nav()}
+  {topic_nav(source)}
 </footer>"""
 
 
-def topic_nav():
-    links = " · ".join(f'<a href="/topic/{s}/">{e(t)}</a>' for t, s, _ in TOPIC_PAGES)
+def topic_nav(source="hn"):
+    links = " · ".join(f'<a href="{topic_url(source, s)}">{e(t)}</a>' for t, s, _ in TOPIC_PAGES[source])
     return f'<nav class="foot-topics" aria-label="Topics">Courses by topic: {links}</nav>' if links else ""
 
 
-def end(scripts):
+def end(scripts, source="hn"):
     tags = "\n".join(f'<script src="{s}" defer></script>' for s in scripts)
-    return f"{HELP}\n{footer()}\n{tags}\n</body>\n</html>\n"
+    return f"{HELP}\n{footer(source)}\n{tags}\n</body>\n</html>\n"
 
 
 # ---- pages ------------------------------------------------------------------------
@@ -208,25 +249,38 @@ WEBSITE = {"@type": "WebSite", "@id": f"{BASE}/#website", "url": f"{BASE}/", "na
 FIRST_SCREEN = 60  # app.js shows this many cards before "Show more"
 
 
-def index_page(meta, courses):
+def index_page(meta, courses, source="hn"):
+    reddit = source == "reddit"
     top = ", ".join(c["name"] for c in courses[:3])
-    desc = (f"{meta['courses']:,} online courses programmers keep recommending, ranked from {meta['comments']:,} "
-            f"public Hacker News comments, {SPAN}. Top picks: {top}.")
+    if reddit:
+        desc = (f"{meta['courses']:,} online courses Redditors keep recommending, ranked from {meta['comments']:,} "
+                f"public Reddit comments in {REDDIT_COMMUNITIES} communities. Top picks: {top}.")
+        title, h1 = f"{NAME}: the online courses Reddit recommends", "The online courses recommended most on Reddit"
+        coll, listing = f"{NAME}: the courses Redditors keep recommending", "Courses Redditors recommend most on Reddit"
+    else:
+        desc = (f"{meta['courses']:,} online courses programmers keep recommending, ranked from {meta['comments']:,} "
+                f"public Hacker News comments, {SPAN}. Top picks: {top}.")
+        title, h1 = (f"{NAME}: the online courses programmers recommend on Hacker News",
+                     "The online courses programmers recommend most on Hacker News")
+        coll, listing = (f"{NAME}: the courses programmers keep recommending",
+                         "Courses programmers recommend most on Hacker News")
+    path = home(source)
     ld = {"@context": "https://schema.org", "@graph": [
         WEBSITE | {"description": desc},
-        {"@type": "CollectionPage", "@id": f"{BASE}/", "url": f"{BASE}/", "name": f"{NAME}: the courses programmers keep recommending",
+        {"@type": "CollectionPage", "@id": f"{BASE}{path}", "url": f"{BASE}{path}", "name": coll,
          "isPartOf": {"@id": f"{BASE}/#website"}, "dateModified": iso(meta["data_end"]),
-         "mainEntity": item_list(courses[:FIRST_SCREEN], "Courses programmers recommend most on Hacker News")}]}
+         "mainEntity": item_list(courses[:FIRST_SCREEN], listing)}]}
     cards = "".join(card_html(c, eager=i < 6) for i, c in enumerate(courses[:FIRST_SCREEN]))
-    return (head(f"{NAME}: the online courses programmers recommend on Hacker News", desc, "/",
-                 f"{BASE}/img/og/site.png", extra=json_ld(ld))
-            + header()
+    switch = source_switch(source) + "\n  " if has_switch(meta, source) else ""
+    scripts = ["/reddit/courses.js" if reddit else "/courses.js", "/app.js"]
+    return (head(title, desc, path, f"{BASE}/img/og/site.png", extra=json_ld(ld))
+            + header(source=source, tag=tagline(source, meta["comments"]))
             + f"""
 <div id="listView">
-  <nav class="views" aria-label="Views"><div role="tablist" id="views"></div></nav>
+  {switch}<nav class="views" aria-label="Views"><div role="tablist" id="views"></div></nav>
   <div class="filters" id="filters" aria-label="Filters"></div>
   <main id="main">
-    <h1 class="visually-hidden">The online courses programmers recommend most on Hacker News</h1>
+    <h1 class="visually-hidden">{h1}</h1>
     <p class="status" id="status" aria-live="polite">{meta['courses']:,} courses · sorted by best ranked.</p>
     <div id="grid" class="grid" role="grid" aria-labelledby="status" aria-describedby="gridHint">{cards}</div>
     <p id="gridHint" class="visually-hidden">Arrow keys move between courses, Enter opens one, S saves it.</p>
@@ -234,42 +288,56 @@ def index_page(meta, courses):
   </main>
 </div>
 """
-            + end(["/courses.js", "/app.js"]))
+            + end(scripts, source))
 
 
-def topic_page(topic, slug, courses, meta):
+def topic_page(topic, slug, courses, meta, source="hn"):
+    reddit = source == "reddit"
     n = len(courses)
     top = ", ".join(c["name"] for c in courses[:3])
-    title = f"Best {topic} courses, as recommended on Hacker News"
-    desc = (f"The {n} {topic} courses programmers recommend on Hacker News, ranked from public comments, {SPAN}. "
-            f"Top picks: {top}.")
-    path = f"/topic/{slug}/"
+    where = SOURCE_NAMES[source]
+    title = f"Best {topic} courses, as recommended on {where}"
+    if reddit:
+        desc = (f"The {n} {topic} courses Redditors recommend, ranked from public Reddit comments. "
+                f"Top picks: {top}.")
+    else:
+        desc = (f"The {n} {topic} courses programmers recommend on Hacker News, ranked from public comments, {SPAN}. "
+                f"Top picks: {top}.")
+    who = "Redditors" if reddit else "programmers"
+    span_text = "" if reddit else f", {SPAN}"
+    path = topic_url(source, slug)
     ld = {"@context": "https://schema.org", "@graph": [
         {"@type": "CollectionPage", "@id": f"{BASE}{path}", "url": f"{BASE}{path}", "name": title, "description": desc,
          "isPartOf": {"@id": f"{BASE}/#website"}, "about": topic,
          "dateModified": iso(max(c["last"] for c in courses)),
-         "mainEntity": item_list(courses, f"{topic} courses ranked by Hacker News recommendations")},
+         "mainEntity": item_list(courses, f"{topic} courses ranked by {where} recommendations")},
         {"@type": "BreadcrumbList", "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": NAME, "item": f"{BASE}/"},
+            {"@type": "ListItem", "position": 1, "name": NAME, "item": f"{BASE}{home(source)}"},
             {"@type": "ListItem", "position": 2, "name": topic, "item": f"{BASE}{path}"}]}]}
     free = sum(c["cost"] == "free" for c in courses)
     recs = sum(c["recommenders"] for c in courses)
-    others = "".join(f'<a class="chip" href="/topic/{s}/">{e(t)} ({k})</a>' for t, s, k in TOPIC_PAGES if s != slug)
+    others = "".join(f'<a class="chip" href="{topic_url(source, s)}">{e(t)} ({k})</a>'
+                     for t, s, k in TOPIC_PAGES[source] if s != slug)
+    switch = ""
+    if has_switch(meta, source):
+        other = "hn" if reddit else "reddit"
+        has_other = slug in meta.get("topics", {}).get(other, ())
+        switch = source_switch(source, {other: topic_url(other, slug) if has_other else home(other)}) + "\n"
     return (head(title, desc, path, f"{BASE}/img/og/{slug}.png", extra=json_ld(ld))
-            + header()
+            + header(source=source, tag=tagline(source, meta["comments"]))
             + f"""
-<main id="main" class="topic-page" tabindex="-1">
-  <nav class="crumbs" aria-label="Breadcrumb"><a href="/">← All courses</a></nav>
+{switch}<main id="main" class="topic-page" tabindex="-1">
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{home(source)}">← All courses</a></nav>
   <h1>Best {e(topic)} courses</h1>
-  <p class="intro">The {e(plural(n, f"{topic} course"))} programmers recommend to each other on Hacker News, ranked by
+  <p class="intro">The {e(plural(n, f"{topic} course"))} {who} recommend to each other on {where}, ranked by
   how many people recommended each one, how strongly, in how many separate threads and over how many years
-  ({plural(recs, "recommendation")}, {SPAN}). {free:,} of them are free. <a href="/about/">How ranking works</a>.</p>
+  ({plural(recs, "recommendation")}{span_text}). {free:,} of them are free. <a href="/about/">How ranking works</a>.</p>
   <div class="grid static">{"".join(card_html(c, eager=i < 6) for i, c in enumerate(courses))}</div>
   <h2 class="section-h other-topics">Other topics</h2>
   <div class="facts">{others}</div>
 </main>
 """
-            + end([]))
+            + end([], source))
 
 
 def badges_html(c):
@@ -523,7 +591,7 @@ def llms_txt(courses, meta, by_topic):
            "the comments behind its ranking and links each one to Hacker News. The catalog, rankings and summaries "
            "are CC BY 4.0; please cite and link the course page. Not affiliated with Y Combinator or Hacker News.", "",
            "## Courses by topic", ""]
-    for t, s, n in TOPIC_PAGES:
+    for t, s, n in TOPIC_PAGES["hn"]:
         out.append(f"- [{t}]({BASE}/topic/{s}/): {n} courses. Top: "
                    + ", ".join(c["name"] for c in by_topic[t][:5]))
     out += ["", "## Top 30 overall", ""] + [course_line(c) for c in courses[:30]]
@@ -566,20 +634,29 @@ def view(c, source):
 def write_all(courses, comments, data_end):
     """courses: build.py's merged courses (shared fields, slug, related, sources).
 
-    Renders the Hacker News pages from HN views of the courses recommended on HN."""
-    courses = sorted((view(c, "hn") for c in courses if "hn" in c["sources"]), key=lambda c: c["rank"])
-    comments_hn = sum(1 for cm in comments if cm.get("src", "hn") == "hn")
+    Renders each source's pages from that source's views. Course pages are still HN-only. The
+    switch and the Reddit pages exist only when some course was recommended on Reddit."""
+    ranked = {src: sorted((view(c, src) for c in courses if src in c["sources"]), key=lambda c: c["rank"])
+              for src in SOURCE_NAMES}
+    courses = ranked["hn"]
+    has_reddit = bool(ranked["reddit"])
+    comments_in = {src: sum(1 for cm in comments if cm.get("src", "hn") == src) for src in SOURCE_NAMES}
     configure(data_end)
     by_id = {c["id"]: c for c in courses}
     for i, c in enumerate(courses):
         c["prev"] = courses[i - 1] if i > 0 else None
         c["next"] = courses[i + 1] if i + 1 < len(courses) else None
-    meta = {"courses": len(courses), "comments": comments_hn, "data_end": data_end}
-    by_topic = {}
-    for c in courses:
-        by_topic.setdefault(c["topic"], []).append(c)
-    TOPIC_PAGES[:] = [(t, topic_slug(t), len(by_topic[t])) for t in [name for name, _ in TOPICS] + [OTHER]
-                      if t in by_topic]
+    by_topic = {src: {} for src in SOURCE_NAMES}
+    for src, cs in ranked.items():
+        for c in cs:
+            by_topic[src].setdefault(c["topic"], []).append(c)
+        TOPIC_PAGES[src][:] = [(t, topic_slug(t), len(by_topic[src][t]))
+                               for t in [name for name, _ in TOPICS] + [OTHER] if t in by_topic[src]]
+    metas = {src: {"courses": len(ranked[src]), "comments": comments_in[src], "data_end": data_end,
+                   "reddit": has_reddit,
+                   "topics": {s: {slug for _, slug, _ in TOPIC_PAGES[s]} for s in SOURCE_NAMES}}
+             for src in SOURCE_NAMES}
+    meta = metas["hn"]
 
     for old in (SITE / "course").glob("*/index.html"):
         old.unlink()
@@ -590,28 +667,36 @@ def write_all(courses, comments, data_end):
     for c in courses:
         c.pop("prev", None), c.pop("next", None)
 
-    for old in (SITE / "topic").glob("*/index.html"):
-        old.unlink()
-    for t, s, _ in TOPIC_PAGES:
-        d = SITE / "topic" / s
-        d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(topic_page(t, s, by_topic[t], meta), encoding="utf-8")
+    for src in SOURCE_NAMES:
+        root = SITE / "reddit" if src == "reddit" else SITE
+        for old in (root / "topic").glob("*/index.html"):
+            old.unlink()
+        if src == "reddit" and not has_reddit:
+            continue
+        for t, s, _ in TOPIC_PAGES[src]:
+            d = root / "topic" / s
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "index.html").write_text(topic_page(t, s, by_topic[src][t], metas[src], src), encoding="utf-8")
+        root.mkdir(parents=True, exist_ok=True)
+        (root / "index.html").write_text(index_page(metas[src], ranked[src], src), encoding="utf-8")
 
-    (SITE / "index.html").write_text(index_page(meta, courses), encoding="utf-8")
     (SITE / "about").mkdir(exist_ok=True)
     (SITE / "about" / "index.html").write_text(about_page(meta), encoding="utf-8")
     (SITE / "404.html").write_text(not_found_page(), encoding="utf-8")
     (SITE / "_headers").write_text(HEADERS, encoding="utf-8")
     (SITE / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {BASE}/sitemap.xml\n", encoding="utf-8")
-    (SITE / "llms.txt").write_text(llms_txt(courses, meta, by_topic), encoding="utf-8")
+    (SITE / "llms.txt").write_text(llms_txt(courses, meta, by_topic["hn"]), encoding="utf-8")
     (SITE / "llms-full.txt").write_text(llms_full_txt(courses, meta), encoding="utf-8")
 
     # lastmod is the newest comment behind each page, so crawlers can trust it and skip unchanged pages.
     def newest(cs):
         return iso(max(comments[ci]["t"] for c in cs for ci, _ in c["endorsements"]))
-    urls = ([("/", iso(data_end)), ("/about/", iso(data_end))]
-            + [(f"/topic/{s}/", newest(by_topic[t])) for t, s, _ in TOPIC_PAGES]
-            + [(f"/course/{c['slug']}/", newest([c])) for c in courses])
+    urls = [("/", iso(data_end)), ("/about/", iso(data_end))]
+    urls += [(f"/topic/{s}/", newest(by_topic["hn"][t])) for t, s, _ in TOPIC_PAGES["hn"]]
+    if has_reddit:
+        urls.append(("/reddit/", iso(data_end)))
+        urls += [(topic_url("reddit", s), newest(by_topic["reddit"][t])) for t, s, _ in TOPIC_PAGES["reddit"]]
+    urls += [(f"/course/{c['slug']}/", newest([c])) for c in courses]
     (SITE / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         + "".join(f"<url><loc>{BASE}{u}</loc><lastmod>{m}</lastmod></url>\n" for u, m in urls)
