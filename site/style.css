@@ -121,6 +121,7 @@ main { padding: 0 clamp(16px, 4vw, 40px) 40px; }
 }
 .thumb { margin: -6px -6px 2px; }
 .thumb img, .hero-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.tall img { object-position: center 18%; }
 .card.seen .thumb img { opacity: .7; }
 .hero { margin: 0 0 6px; }
 .hero-img { border-radius: var(--radius); max-height: 360px; }

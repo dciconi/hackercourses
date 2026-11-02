@@ -58,6 +58,8 @@ def main():
             "format": s.get("format", "unknown"), "tags": s.get("tags", []),
             # Preview image from the course's own page; the site falls back to a topic illustration.
             "img": (images.get(str(cid)) or {}).get("src"), "imgPage": (images.get(str(cid)) or {}).get("page"),
+            # Portrait/square images (MIT OCW) are cropped from the top on 16:9 cards.
+            "imgTall": bool(images.get(str(cid))) and images[str(cid)]["h"] > 0.8 * images[str(cid)]["w"],
             "score": round(rank.score(ends), 3), "trend": round(rank.trending(ends, now), 3),
             "recommenders": recommenders, "threads": len({e["thread"] for e in positive}),
             "mentions": len(ends), "first": min(times), "last": max(times),

@@ -20,6 +20,7 @@ uv run python pipeline/canonicalize.py   # LLM: merge name variants into one cou
 uv run python pipeline/canonicalize.py --dedupe
 uv run python pipeline/summarize.py      # LLM per course: summary, facets, best link, stance of each comment -> data/summaries.jsonl
 uv run python pipeline/images.py         # preview image per course (og:image / YouTube thumbnail), checked -> data/images.json
+uv run python pipeline/discover_images.py  # second pass: verified current course pages, then archived copies of dead links
 uv run python pipeline/placeholders.py   # one original illustration per topic -> site/img/topics/*.svg
 uv run python pipeline/build.py          # ranking, badges, related courses -> site/data.js
 uv run pytest -q tests
@@ -28,11 +29,16 @@ uv run pytest -q tests
 Every LLM step reads `OPEN_ROUTER_API_KEY` from `.env` (git-ignored), uses a strict JSON schema, and is
 resumable. Fetch and thread passes never write raw shards to disk.
 
-**Images.** `images.py` uses the preview image each course page publishes for link sharing (or a
-YouTube video thumbnail), only after downloading it once to confirm it is a real landscape image of
-at least 300x150; pictures shared by 3+ courses (site-wide defaults) are dropped. The site hotlinks
-them with no referrer and swaps to the topic illustration if one fails to load. These images belong to
-the course providers; nothing is re-hosted. The 13 topic illustrations are original line art.
+**Images.** `images.py` uses the preview image each course page publishes for link sharing (YouTube
+videos and playlists via YouTube's public oEmbed endpoint), else the first large image on the page.
+Each image is downloaded once to confirm it is real and at least 300px wide; plain page images must
+also be clearly landscape and not come from people/staff paths, so headshots never slip in.
+`discover_images.py` handles courses whose posted links are dead: Haiku suggests likely current course
+pages, used only when the page title matches the course (75% of its key words, or the same course
+code; tested in `tests/test_discover_images.py`), then falls back to the Internet Archive's copy of the
+posted link. Pictures shared by 3+ courses (site-wide defaults) are dropped. The site hotlinks images
+with no referrer and swaps to the topic illustration if one fails to load. These images belong to the
+course providers; nothing is re-hosted. The 13 topic illustrations are original line art.
 
 ### Models and cost
 

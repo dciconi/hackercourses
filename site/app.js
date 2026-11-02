@@ -77,6 +77,7 @@
     img.referrerPolicy = "no-referrer";
     img.src = c.img || topicArt(c.topic);
     if (!c.img) box.classList.add("art");
+    else if (c.imgTall) box.classList.add("tall");
     img.addEventListener("error", () => {
       if (!box.classList.contains("art")) { box.classList.add("art"); img.src = topicArt(c.topic); }
     });
