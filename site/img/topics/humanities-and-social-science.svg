@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Humanities &amp; Social Science">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34281c"/><stop offset="1" stop-color="#503d29"/></linearGradient>
+<pattern id="d" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.6" fill="#f6efe2" opacity=".12"/></pattern>
+</defs>
+<rect width="640" height="360" fill="url(#g)"/><rect width="640" height="360" fill="url(#d)"/>
+<path d="M320 110 C 280 90, 220 88, 175 100 V 270 C 220 258, 280 260, 320 280 Z" fill="none" stroke="#f6efe2" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M320 110 C 360 90, 420 88, 465 100 V 270 C 420 258, 360 260, 320 280 Z" fill="none" stroke="#f6efe2" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><line x1="200" y1="140" x2="295" y2="145" stroke="#f6efe2" stroke-width="4" stroke-linecap="round"/><line x1="200" y1="170" x2="295" y2="175" stroke="#f6efe2" stroke-width="4" stroke-linecap="round"/><line x1="200" y1="200" x2="295" y2="205" stroke="#f6efe2" stroke-width="4" stroke-linecap="round"/><line x1="200" y1="230" x2="295" y2="235" stroke="#f6efe2" stroke-width="4" stroke-linecap="round"/><line x1="345" y1="145" x2="440" y2="140" stroke="#f6efe2" stroke-width="4" stroke-linecap="round"/><line x1="345" y1="175" x2="440" y2="170" stroke="#f6efe2" stroke-width="4" stroke-linecap="round"/><line x1="345" y1="205" x2="440" y2="200" stroke="#f6efe2" stroke-width="4" stroke-linecap="round"/><path d="M405 92 V 150 L420 138 L435 150 V 90" fill="#ff7a1f" stroke="#ff7a1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

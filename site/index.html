@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hacker Courses</title>
+<meta name="description" content="The online courses programmers keep recommending, ranked from 18 years of public forum comments.">
+<link rel="canonical" href="https://hackercourses.com/">
+<meta property="og:site_name" content="Hacker Courses">
+<meta property="og:title" content="Hacker Courses">
+<meta property="og:description" content="The online courses programmers keep recommending, ranked from 18 years of public forum comments.">
+<meta property="og:url" content="https://hackercourses.com/">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff6600'/%3E%3Cpath d='M9 10h14M9 16h10M9 22h6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#grid">Skip to courses</a>
+<header class="top">
+  <a class="brand" href="#/" aria-label="Hacker Courses, home">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M9 10h14M9 16h10M9 22h6"/></svg>
+    <span>
+      <span class="name">Hacker Courses</span>
+      <span class="sub" id="summary">Loading…</span>
+    </span>
+  </a>
+  <div class="search">
+    <label for="q" class="visually-hidden">Search courses</label>
+    <input id="q" type="search" placeholder="Search courses, instructors, topics" autocomplete="off">
+    <kbd aria-hidden="true">/</kbd>
+  </div>
+  <div class="tools">
+    <button class="icon-btn" id="themeBtn" aria-label="Toggle light or dark theme" title="Theme (T)">◐</button>
+    <button class="icon-btn" id="aboutBtn" aria-haspopup="dialog" title="How ranking works">i</button>
+    <button class="icon-btn" id="helpBtn" aria-haspopup="dialog" aria-label="Keyboard shortcuts" title="Shortcuts (?)">?</button>
+  </div>
+</header>
+
+<div id="listView">
+  <nav class="views" aria-label="Views">
+    <div role="tablist" id="views"></div>
+  </nav>
+  <div class="filters" id="filters" aria-label="Filters"></div>
+  <main>
+    <p class="status" id="status" aria-live="polite"></p>
+    <div id="grid" class="grid" role="grid" aria-labelledby="status" aria-describedby="gridHint"></div>
+    <p id="gridHint" class="visually-hidden">Arrow keys move between courses, Enter opens one, S saves it.</p>
+    <button id="more" class="btn more" hidden>Show more</button>
+  </main>
+</div>
+
+<main id="courseView" hidden tabindex="-1" aria-labelledby="cName"></main>
+
+<dialog id="help" aria-labelledby="hTitle">
+  <h2 id="hTitle">Keyboard</h2>
+  <dl class="keys">
+    <dt><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd></dt><dd>Move between courses</dd>
+    <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>Start / end of row (with <kbd>Ctrl</kbd>: first / last)</dd>
+    <dt><kbd>PgUp</kbd> <kbd>PgDn</kbd></dt><dd>Jump several rows</dd>
+    <dt><kbd>Enter</kbd></dt><dd>Open course</dd>
+    <dt><kbd>S</kbd></dt><dd>Save / unsave course</dd>
+    <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Best, Trending, Hidden gems, Evergreen, Saved</dd>
+    <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next topic</dd>
+    <dt><kbd>/</kbd></dt><dd>Search</dd>
+    <dt><kbd>T</kbd></dt><dd>Light / dark theme</dd>
+    <dt class="keys-h">On a course page</dt>
+    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Previous / next course in the list</dd>
+    <dt><kbd>O</kbd></dt><dd>Open the course website</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Back to the grid</dd>
+  </dl>
+  <button class="btn" id="hClose">Close</button>
+</dialog>
+
+<dialog id="about" aria-labelledby="aTitle">
+  <h2 id="aTitle">How ranking works</h2>
+  <p>Comment karma is not public, so each course is scored from who recommended it, how strongly, in how many separate discussions, and for how long.</p>
+  <ol class="method">
+    <li><strong>Stance.</strong> Every comment is labelled for the course it mentions: strongly recommends (1.0), recommends (0.7), mentions (0.25) or criticizes (0).</li>
+    <li><strong>One vote per person.</strong> Someone who recommends a course five times counts once, at their strongest stance.</li>
+    <li><strong>Pile-ons are damped.</strong> Within one thread, votes decay by half each (1, ½, ¼…). Ten replies in one thread are worth less than two independent threads; the same course surfacing in ten unrelated threads counts ten times.</li>
+    <li><strong>Staying power.</strong> Each extra calendar year in which people recommended it adds 8%.</li>
+  </ol>
+  <p><strong>Trending</strong> uses the same votes, halving their weight every two years back from the newest comment in the data.</p>
+  <h3>Badges</h3>
+  <dl class="badge-defs">
+    <dt><span class="badge classic">Classic</span></dt><dd>Top-ranked and recommended across at least eight years.</dd>
+    <dt><span class="badge evergreen">Evergreen</span></dt><dd>Recommended in six or more different years.</dd>
+    <dt><span class="badge rising">Rising</span></dt><dd>Most of its support came in the last three years of data.</dd>
+    <dt><span class="badge gem">Hidden gem</span></dt><dd>Only two to four recommenders, but nearly all of them emphatic.</dd>
+  </dl>
+  <p class="fine">Comments were found with keyword rules and reviewed by AI models (Claude Haiku 5.5 and Sonnet 5.5), which also merged course name variants, labelled stances and wrote the summaries. Expect a few misses.</p>
+  <button class="btn" id="aClose">Close</button>
+</dialog>
+
+<footer class="foot">
+  Built from public comments in the <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> dataset (Apache-2.0), 2006 to September 2024.
+  Each comment belongs to its author; course images belong to the course providers.
+  Not affiliated with Y Combinator or Hacker News.
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

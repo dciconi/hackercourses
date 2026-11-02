@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Databases &amp; Data Engineering">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#33203a"/><stop offset="1" stop-color="#4d3058"/></linearGradient>
+<pattern id="d" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.6" fill="#f6efe2" opacity=".12"/></pattern>
+</defs>
+<rect width="640" height="360" fill="url(#g)"/><rect width="640" height="360" fill="url(#d)"/>
+<ellipse cx="320" cy="100" rx="110" ry="30" fill="#ff7a1f" stroke="#ff7a1f" stroke-width="6"/><line x1="210" y1="100" x2="210" y2="260" stroke="#f6efe2" stroke-width="6" stroke-linecap="round"/><line x1="430" y1="100" x2="430" y2="260" stroke="#f6efe2" stroke-width="6" stroke-linecap="round"/><path d="M210 153 A110 30 0 0 0 430 153" fill="none" stroke="#f6efe2" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M210 206 A110 30 0 0 0 430 206" fill="none" stroke="#f6efe2" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M210 260 A110 30 0 0 0 430 260" fill="none" stroke="#f6efe2" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

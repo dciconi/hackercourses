@@ -1,0 +1,11 @@
+# secrets
+.env
+
+# pipeline working data (930 MB of candidates + intermediate LLM outputs); rebuild with pipeline/
+data/
+data_*.log
+
+# python
+.venv/
+__pycache__/
+.pytest_cache/
