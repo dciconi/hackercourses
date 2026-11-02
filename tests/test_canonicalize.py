@@ -45,3 +45,29 @@ def test_dedupe_merges_are_links_and_reversible():
 def test_mooc_is_not_the_campus_course_unless_codes_match():
     assert not compatible(c("Machine Learning (Andrew Ng)", "Coursera"), c("CS229 Machine Learning", "Stanford University"))
     assert compatible(c("CS50: Introduction to Computer Science", "Harvard University"), c("CS50x", "edX"))
+
+
+def test_dedupe_reddit_never_merges_two_hn_entries(monkeypatch):
+    import canonicalize
+    cat = {"courses": [{"id": 0, **c("Algorithms", "Coursera")},
+                       {"id": 1, **c("Algorithms Course", "Coursera")},
+                       {"id": 2, **c("Algorithms", "Coursera (Princeton)"), "origin": "reddit"},
+                       {"id": 3, **c("Old Dup", "X"), "merged_into": 0},
+                       {"id": 4, **c("Other", "Y"), "origin": "reddit"}],
+           "aliases": {}}
+    monkeypatch.setattr(canonicalize, "structured",
+                        lambda *a, **k: ({"groups": [[0, 1, 2]]}, 0.0))
+    canonicalize.dedupe_reddit(cat, "key")
+    assert cat["courses"][2]["merged_into"] == 0
+    assert "merged_into" not in cat["courses"][1]
+    assert cat["courses"][3]["merged_into"] == 0  # pre-existing link survives
+    assert "merged_into" not in cat["courses"][0]
+
+
+def test_dedupe_reddit_keeps_hn_entry_with_reddit_keeper(monkeypatch):
+    import canonicalize
+    cat = {"courses": [{"id": 0, **c("Algo", "Coursera"), "origin": "reddit"},
+                       {"id": 1, **c("Algo", "Coursera")}], "aliases": {}}
+    monkeypatch.setattr(canonicalize, "structured", lambda *a, **k: ({"groups": [[0, 1]]}, 0.0))
+    canonicalize.dedupe_reddit(cat, "key")
+    assert "merged_into" not in cat["courses"][1]  # hn entry is never the duplicate
