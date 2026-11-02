@@ -97,17 +97,31 @@ def summarize(course, comments, threads, key):
     valid = {it["id"] for it in chosen}
     out["stances"] = {str(s["comment_id"]): s["stance"] for s in out["stances"] if s["comment_id"] in valid}
     out["id"] = course["id"]
+    out["comment_ids"] = sorted(valid)  # lets a later run tell when the course gained comments
     return out, cost
+
+
+def covered(summary):
+    return set(summary.get("comment_ids") or map(int, summary["stances"]))
+
+
+def chosen_ids(comments):
+    return {it["id"] for it in sorted(comments, key=lambda it: -len(it["text"]))[:MAX_COMMENTS]}
 
 
 def main():
     key = api_key()
     threads = json.loads(THREADS.read_text(encoding="utf-8")) if THREADS.exists() else {}
     cat, by_course = course_comments()
-    done = set()
+    done = {}  # later lines win: a re-summarized course is appended again
     if SUMMARIES.exists():
-        done = {json.loads(line)["id"] for line in SUMMARIES.open(encoding="utf-8")}
-    todo = sorted((cid for cid in by_course if cid not in done), key=lambda cid: -len(by_course[cid]))
+        for line in SUMMARIES.open(encoding="utf-8"):
+            s = json.loads(line)
+            done[s["id"]] = s
+    # New courses, plus courses whose comments changed since they were summarized.
+    todo = sorted((cid for cid in by_course
+                   if cid not in done or not chosen_ids(by_course[cid]) <= covered(done[cid])),
+                  key=lambda cid: -len(by_course[cid]))
     if len(sys.argv) > 1:
         todo = todo[: int(sys.argv[1])]
     print(f"{len(by_course)} courses, {len(todo)} to summarize", flush=True)

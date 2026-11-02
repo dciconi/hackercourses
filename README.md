@@ -1,7 +1,7 @@
 # Hacker Courses
 
-The online courses programmers keep recommending, ranked from 18 years of public Hacker News
-comments (2006 – Sep 2024). A static, keyboard-navigable site: no accounts, no backend, no build step.
+The online courses programmers keep recommending, ranked from public Hacker News comments since 2006
+(refreshed up to the run date). A static, keyboard-navigable site: no accounts, no backend, no build step.
 Domain: hackercourses.com (not deployed yet).
 
 No YC or HN logos or names are used as branding; Hacker News is credited only as the data source,
@@ -10,19 +10,21 @@ and the footer states the site is not affiliated with either.
 ## Pipeline
 
 ```bash
-uv run python pipeline/fetch.py          # stream nixiesearch/hackernews-comments (~6.3 GB zstd), keep course mentions -> data/candidates.jsonl
+uv run python pipeline/fetch.py          # stream nixiesearch/hackernews-comments (~6.3 GB zstd, to Oct 2024), keep course mentions -> data/candidates.jsonl
+uv run python pipeline/fetch_recent.py   # newer comments: open-index/hacker-news Parquet (via DuckDB) + HN Search API for the last weeks
 uv run python pipeline/classify.py       # rules: spam filter + "recommends a course" -> data/pool.json, data/courses.json
 uv run python pipeline/review.py         # LLM: does each comment really recommend a course? -> data/llm_labels.jsonl
 uv run python pipeline/review.py --recheck-spam
 uv run python pipeline/classify.py       # apply the verdicts -> data/courses.json
 uv run python pipeline/threads.py        # second dataset pass: thread title for every comment -> data/threads.json
+uv run python pipeline/threads.py --missing  # thread titles for comments added by fetch_recent.py
 uv run python pipeline/canonicalize.py   # LLM: merge name variants into one course -> data/catalog.json
 uv run python pipeline/canonicalize.py --dedupe
 uv run python pipeline/summarize.py      # LLM per course: summary, facets, best link, stance of each comment -> data/summaries.jsonl
 uv run python pipeline/images.py         # preview image per course (og:image / YouTube thumbnail), checked -> data/images.json
 uv run python pipeline/discover_images.py  # second pass: verified current course pages, then archived copies of dead links
 uv run python pipeline/placeholders.py   # one original illustration per topic -> site/img/topics/*.svg
-uv run python pipeline/build.py          # ranking, badges, related courses -> site/data.js
+uv run python pipeline/build.py          # ranking, badges, related courses, all pages -> site/
 uv run pytest -q tests
 ```
 
@@ -111,3 +113,14 @@ hackercourses.com is registered at Namecheap; its nameservers point to Cloudflar
 Keys: arrows move, Home/End, Ctrl+Home/End, PgUp/PgDn, Enter opens, S saves, 1–5 views, `[` `]` topics,
 `/` search, T theme, `?` help; on a course page ← → previous/next course, O opens the course site,
 Esc goes back.
+
+## License
+
+- **Code and original artwork**: [MIT](LICENSE).
+- **Generated data** (catalog, rankings, summaries, facets, stance labels): CC BY 4.0.
+- **Hacker News comments** quoted on the site remain their authors' and are not licensed by this
+  project; removal requests via GitHub issues. Course images are hotlinked and belong to the providers.
+- Source datasets and their licenses (Apache-2.0, ODC-By) are credited in [`NOTICE`](NOTICE).
+
+Details in [`DATA-LICENSE.md`](DATA-LICENSE.md). The "Hacker Courses" name and logo are not licensed;
+forks should use their own name.

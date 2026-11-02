@@ -165,7 +165,7 @@ SITE_CARD = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
 <path d="M130 188h52M130 210h38M130 232h22" stroke="#fff" stroke-width="11" stroke-linecap="round"/>
 <text x="246" y="240" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="700" fill="{INK}">Hacker Courses</text>
 <text x="100" y="380" font-family="Segoe UI, Arial, sans-serif" font-size="46" fill="{INK}" opacity=".85">The online courses programmers keep recommending,</text>
-<text x="100" y="442" font-family="Segoe UI, Arial, sans-serif" font-size="46" fill="{INK}" opacity=".85">ranked from 18 years of public comments.</text>
+<text x="100" y="442" font-family="Segoe UI, Arial, sans-serif" font-size="46" fill="{INK}" opacity=".85">ranked from public comments since 2006.</text>
 <rect x="100" y="510" width="210" height="8" rx="4" fill="{ACCENT}"/>
 </svg>"""
 

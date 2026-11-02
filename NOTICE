@@ -1,0 +1,28 @@
+Hacker Courses
+Copyright (c) 2026 Diego Ciconi
+
+The code and original artwork in this repository are licensed under the MIT License (see LICENSE).
+Generated data and third-party content are covered by DATA-LICENSE.md.
+
+This project uses data from the following sources:
+
+- nixiesearch/hackernews-comments
+  https://huggingface.co/datasets/nixiesearch/hackernews-comments
+  Licensed under the Apache License, Version 2.0.
+  Hacker News items from 2006 to September 2024.
+
+- open-index/hacker-news
+  https://huggingface.co/datasets/open-index/hacker-news
+  Licensed under the Open Data Commons Attribution License (ODC-By) v1.0.
+  Hacker News items from October 2024 onward.
+
+- HN Search API by Algolia
+  https://hn.algolia.com/api
+  Recent Hacker News comments and their thread titles.
+
+- Hacker News API
+  https://github.com/HackerNews/API
+  Thread titles for recent comments.
+
+Hacker News comments remain the property of their authors and are not licensed by this
+project. Hacker Courses is not affiliated with Y Combinator or Hacker News.

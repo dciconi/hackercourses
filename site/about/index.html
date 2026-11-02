@@ -23,7 +23,7 @@
     <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M9 10h14M9 16h10M9 22h6"/></svg>
     <span>
       <span class="name">Hacker Courses</span>
-      <span class="sub" id="summary">The online courses programmers keep recommending, ranked from 18 years of public forum comments.</span>
+      <span class="sub" id="summary">The online courses programmers keep recommending, ranked from 20 years of public forum comments.</span>
     </span>
   </a>
   <form class="search" action="/" method="get" role="search">
@@ -47,7 +47,7 @@
   </aside>
 
   <p>Hacker Courses collects the online courses programmers recommend to each other in public Hacker News comments,
-  from 2006 to September 2024: 1,324 courses drawn from 3,210 comments.</p>
+  from 2006 to October 2026: 1,376 courses drawn from 3,371 comments.</p>
 
   <h2>How ranking works</h2>
   <p>Comment karma is not public, so each course is scored from who recommended it, how strongly, in how many
@@ -79,6 +79,13 @@
   Expect a few misses. Course images come from each course's own page; courses without one get an illustration
   for their topic. The full pipeline is <a href="https://github.com/dciconi/hackercourses">open source</a>.</p>
 
+  <h2>License</h2>
+  <p>The code and original artwork are <a href="https://github.com/dciconi/hackercourses/blob/main/LICENSE">MIT licensed</a>. The course catalog,
+  rankings and summaries this project generated are
+  <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Comments remain their authors' and
+  course images their providers'; neither is licensed by this project. Details in
+  <a href="https://github.com/dciconi/hackercourses/blob/main/DATA-LICENSE.md">DATA-LICENSE.md</a>.</p>
+
   <h2>Privacy and removal</h2>
   <p>No accounts, no cookies, no tracking. Saved courses and your theme are kept in your own browser.
   Each comment belongs to its author and links back to the original. To have a comment removed,
@@ -108,7 +115,10 @@
   <button class="btn" id="hClose" type="button">Close</button>
 </dialog>
 <footer class="foot">
-  Built from public comments in the <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> dataset (Apache-2.0), 2006 to September 2024.
+  Built from public Hacker News comments, 2006 to October 2026, via the
+  <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> (Apache-2.0) and
+  <a href="https://huggingface.co/datasets/open-index/hacker-news">open-index/hacker-news</a> (ODC-By) datasets and the
+  <a href="https://hn.algolia.com/api">HN Search API</a>.
   Each comment belongs to its author; course images belong to the course providers.
   Want a comment removed? <a href="https://github.com/dciconi/hackercourses/issues/new?title=Removal%20request&amp;labels=removal">Open a removal request</a>.
   <a href="/about/">About</a> · <a href="https://github.com/dciconi/hackercourses">Source</a>.

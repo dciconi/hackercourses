@@ -14,7 +14,15 @@ from classify import ROOT
 SITE = ROOT / "site"
 BASE = "https://hackercourses.com"
 NAME = "Hacker Courses"
-TAGLINE = "The online courses programmers keep recommending, ranked from 18 years of public forum comments."
+TAGLINE = "The online courses programmers keep recommending, ranked from public forum comments since 2006."
+SPAN = "2006 onward"  # replaced by configure() with the real end of the data, e.g. "2006 to November 2026"
+
+
+def configure(data_end):
+    global TAGLINE, SPAN
+    years = year(data_end) - 2006
+    SPAN = f"2006 to {time.strftime('%B %Y', time.gmtime(data_end))}"
+    TAGLINE = f"The online courses programmers keep recommending, ranked from {years} years of public forum comments."
 REPO = "https://github.com/dciconi/hackercourses"
 STANCE = ["Criticizes", "Mentions", "Recommends", "Strongly recommends"]
 BADGE = {"classic": ("Classic", "classic"), "evergreen": ("Evergreen", "evergreen"),
@@ -121,8 +129,13 @@ HELP = """<dialog id="help" aria-labelledby="hTitle">
   <button class="btn" id="hClose" type="button">Close</button>
 </dialog>"""
 
-FOOTER = f"""<footer class="foot">
-  Built from public comments in the <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> dataset (Apache-2.0), 2006 to September 2024.
+
+def footer():
+    return f"""<footer class="foot">
+  Built from public Hacker News comments, {SPAN}, via the
+  <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> (Apache-2.0) and
+  <a href="https://huggingface.co/datasets/open-index/hacker-news">open-index/hacker-news</a> (ODC-By) datasets and the
+  <a href="https://hn.algolia.com/api">HN Search API</a>.
   Each comment belongs to its author; course images belong to the course providers.
   Want a comment removed? <a href="{REPO}/issues/new?title=Removal%20request&amp;labels=removal">Open a removal request</a>.
   <a href="/about/">About</a> · <a href="{REPO}">Source</a>.
@@ -132,7 +145,7 @@ FOOTER = f"""<footer class="foot">
 
 def end(scripts):
     tags = "\n".join(f'<script src="{s}" defer></script>' for s in scripts)
-    return f"{HELP}\n{FOOTER}\n{tags}\n</body>\n</html>\n"
+    return f"{HELP}\n{footer()}\n{tags}\n</body>\n</html>\n"
 
 
 # ---- pages ------------------------------------------------------------------------
@@ -274,7 +287,7 @@ def about_page(meta):
   </aside>
 
   <p>{NAME} collects the online courses programmers recommend to each other in public Hacker News comments,
-  from 2006 to September 2024: {meta['courses']:,} courses drawn from {meta['comments']:,} comments.</p>
+  from {SPAN}: {meta['courses']:,} courses drawn from {meta['comments']:,} comments.</p>
 
   <h2>How ranking works</h2>
   <p>Comment karma is not public, so each course is scored from who recommended it, how strongly, in how many
@@ -305,6 +318,13 @@ def about_page(meta):
   which also merged the many spellings of each course, labelled each comment's stance and wrote the summaries.
   Expect a few misses. Course images come from each course's own page; courses without one get an illustration
   for their topic. The full pipeline is <a href="{REPO}">open source</a>.</p>
+
+  <h2>License</h2>
+  <p>The code and original artwork are <a href="{REPO}/blob/main/LICENSE">MIT licensed</a>. The course catalog,
+  rankings and summaries this project generated are
+  <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Comments remain their authors' and
+  course images their providers'; neither is licensed by this project. Details in
+  <a href="{REPO}/blob/main/DATA-LICENSE.md">DATA-LICENSE.md</a>.</p>
 
   <h2>Privacy and removal</h2>
   <p>No accounts, no cookies, no tracking. Saved courses and your theme are kept in your own browser.
@@ -340,6 +360,7 @@ HEADERS = """/*
 
 def write_all(courses, comments, data_end):
     """courses must already carry slug, rank and the fields build.py computes."""
+    configure(data_end)
     by_id = {c["id"]: c for c in courses}
     for i, c in enumerate(courses):
         c["prev"] = courses[i - 1] if i > 0 else None
