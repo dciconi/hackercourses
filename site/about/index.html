@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>About · Hacker Courses</title>
-<meta name="description" content="How Hacker Courses finds, ranks and credits the 1,376 online courses programmers recommend in 3,371 public Hacker News comments, 2006 to October 2026.">
+<meta name="description" content="How Hacker Courses finds, ranks and credits the 1,376 online courses programmers recommend in 3,371 public Hacker News comments, 2006 to October 2026 and in public Reddit comments.">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <link rel="canonical" href="https://hackercourses.com/about/">
 <meta property="og:url" content="https://hackercourses.com/about/">
@@ -12,7 +12,7 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:type" content="website">
 <meta property="og:title" content="About · Hacker Courses">
-<meta property="og:description" content="How Hacker Courses finds, ranks and credits the 1,376 online courses programmers recommend in 3,371 public Hacker News comments, 2006 to October 2026.">
+<meta property="og:description" content="How Hacker Courses finds, ranks and credits the 1,376 online courses programmers recommend in 3,371 public Hacker News comments, 2006 to October 2026 and in public Reddit comments.">
 <meta property="og:image" content="https://hackercourses.com/img/og/site.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -21,7 +21,7 @@
 <link rel="alternate" type="text/plain" href="/llms.txt" title="Site summary for language models">
 <link rel="stylesheet" href="/style.css">
 <script src="/common.js"></script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "AboutPage", "@id": "https://hackercourses.com/about/", "url": "https://hackercourses.com/about/", "name": "About Hacker Courses", "description": "How Hacker Courses finds, ranks and credits the 1,376 online courses programmers recommend in 3,371 public Hacker News comments, 2006 to October 2026.", "isPartOf": {"@id": "https://hackercourses.com/#website"}}, {"@type": "Dataset", "name": "Hacker Courses: online courses recommended on Hacker News", "description": "1,376 online courses recommended in 3,371 public Hacker News comments, 2006 to October 2026, with rankings, summaries, topics, levels, costs and formats.", "url": "https://hackercourses.com/", "sameAs": "https://github.com/dciconi/hackercourses", "license": "https://creativecommons.org/licenses/by/4.0/", "isAccessibleForFree": true, "keywords": ["online courses", "Hacker News", "MOOC", "computer science", "programming", "recommendations"], "temporalCoverage": "2006-01-01/2026-10-29", "dateModified": "2026-10-29", "creator": {"@type": "Organization", "name": "Hacker Courses", "url": "https://hackercourses.com/"}, "distribution": [{"@type": "DataDownload", "encodingFormat": "text/plain", "contentUrl": "https://hackercourses.com/llms-full.txt"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "AboutPage", "@id": "https://hackercourses.com/about/", "url": "https://hackercourses.com/about/", "name": "About Hacker Courses", "description": "How Hacker Courses finds, ranks and credits the 1,376 online courses programmers recommend in 3,371 public Hacker News comments, 2006 to October 2026 and in public Reddit comments.", "isPartOf": {"@id": "https://hackercourses.com/#website"}}, {"@type": "Dataset", "name": "Hacker Courses: online courses recommended on Hacker News and Reddit", "description": "2,050 online courses recommended in 3,371 public Hacker News comments, 2006 to October 2026, and 12,717 public Reddit comments, with rankings, summaries, topics, levels, costs and formats.", "url": "https://hackercourses.com/", "sameAs": "https://github.com/dciconi/hackercourses", "license": "https://creativecommons.org/licenses/by/4.0/", "isAccessibleForFree": true, "keywords": ["online courses", "Hacker News", "MOOC", "computer science", "programming", "recommendations"], "temporalCoverage": "2006-01-01/2026-10-29", "dateModified": "2026-10-29", "creator": {"@type": "Organization", "name": "Hacker Courses", "url": "https://hackercourses.com/"}, "distribution": [{"@type": "DataDownload", "encodingFormat": "text/plain", "contentUrl": "https://hackercourses.com/llms-full.txt"}], "isBasedOn": [{"@type": "Dataset", "name": "nixiesearch/hackernews-comments", "url": "https://huggingface.co/datasets/nixiesearch/hackernews-comments"}, {"@type": "Dataset", "name": "open-index/hacker-news", "url": "https://huggingface.co/datasets/open-index/hacker-news"}, {"@type": "Dataset", "name": "HN Search API", "url": "https://hn.algolia.com/api"}, {"@type": "Dataset", "name": "Subreddit comments/submissions 2005-06 to 2023-12 (Watchful1)", "url": "https://academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10"}]}]}</script>
 </head>
 <body><a class="skip" href="#main">Skip to content</a>
 <header class="top">
@@ -53,7 +53,7 @@
   </aside>
 
   <p>Hacker Courses collects the online courses programmers recommend to each other in public Hacker News comments,
-  from 2006 to October 2026: 1,376 courses drawn from 3,371 comments.</p>
+  from 2006 to October 2026: 1,376 courses drawn from 3,371 comments. Reddit has its own list; see <a href="#reddit">Reddit</a> below.</p>
 
   <h2>How ranking works</h2>
   <p>Comment karma is not public, so each course is scored from who recommended it, how strongly, in how many
@@ -84,6 +84,24 @@
   which also merged the many spellings of each course, labelled each comment's stance and wrote the summaries.
   Expect a few misses. Course images come from each course's own page; courses without one get an illustration
   for their topic. The full pipeline is <a href="https://github.com/dciconi/hackercourses">open source</a>.</p>
+
+  <h2 id="reddit">Reddit</h2>
+  <p>The Reddit list is built the same way from 12,717 public comments in
+  20 subreddits, 2006 to 2023, and ranked on its own. The two rankings are never mixed or normalized, so a
+  rank on one says nothing about the other. A course needs at least two different recommenders to be listed
+  from Reddit alone.</p>
+  <ul class="subs"><li><strong>Business &amp; entrepreneurship.</strong> r/Entrepreneur, r/startups, r/smallbusiness, r/SaaS, r/EntrepreneurRideAlong</li><li><strong>Software development.</strong> r/programming, r/ExperiencedDevs, r/webdev, r/learnprogramming, r/Python</li><li><strong>AI &amp; ML.</strong> r/MachineLearning, r/LocalLLaMA, r/artificial, r/ChatGPT, r/learnmachinelearning</li><li><strong>Productivity.</strong> r/productivity, r/getdisciplined</li><li><strong>Marketing &amp; growth.</strong> r/marketing, r/PPC, r/SEO</li></ul>
+  <p><strong>Upvotes.</strong> On Reddit a comment's votes also count. An upvoted comment counts up to twice
+  (the more upvotes, the closer to twice), a comment with no net upvotes counts half, and comments captured
+  less than 30 days after they were posted count without their votes, since they had no time to collect any.</p>
+  <p><strong>Excerpts.</strong> Reddit comments are shown as short excerpts of at most 300 characters, each
+  linking to the full comment on Reddit.</p>
+  <p><strong>Data.</strong> The comments come from the
+  <a href="https://academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10" rel="noopener">per-subreddit Reddit dump by Watchful1</a> on Academic Torrents
+  ("Subreddit comments/submissions 2005-06 to 2023-12", top 40k subreddits), so the Reddit list ends in
+  December 2023. No license or terms were published with that dump. The comments belong to their authors
+  and remain subject to <a href="https://www.redditinc.com/policies/user-agreement" rel="noopener">Reddit's User Agreement</a>.
+  Hacker Courses is not affiliated with Reddit.</p>
 
   <h2>License</h2>
   <p>The code and original artwork are <a href="https://github.com/dciconi/hackercourses/blob/main/LICENSE">MIT licensed</a>. The course catalog,
@@ -128,10 +146,13 @@
   <a href="https://huggingface.co/datasets/nixiesearch/hackernews-comments">nixiesearch/hackernews-comments</a> (Apache-2.0) and
   <a href="https://huggingface.co/datasets/open-index/hacker-news">open-index/hacker-news</a> (ODC-By) datasets and the
   <a href="https://hn.algolia.com/api">HN Search API</a>.
+  Reddit comments come from the <a href="https://academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10">per-subreddit Reddit dump by Watchful1</a> on Academic
+  Torrents (2005 to 2023, no license published; the comments belong to their authors under
+  <a href="https://www.redditinc.com/policies/user-agreement">Reddit's User Agreement</a>).
   Each comment belongs to its author; course images belong to the course providers.
   Want a comment removed? <a href="https://github.com/dciconi/hackercourses/issues/new?template=removal.yml">Open a removal request</a>.
   <a href="/about/">About</a> · <a href="https://github.com/dciconi/hackercourses">Source</a>.
-  Not affiliated with Y Combinator or Hacker News.
+  Not affiliated with Y Combinator, Hacker News or Reddit.
   <nav class="foot-topics" aria-label="Topics">Courses by topic: <a href="/topic/machine-learning-and-ai/">Machine Learning &amp; AI</a> · <a href="/topic/algorithms-and-data-structures/">Algorithms &amp; Data Structures</a> · <a href="/topic/cs-fundamentals-and-systems/">CS Fundamentals &amp; Systems</a> · <a href="/topic/mathematics/">Mathematics</a> · <a href="/topic/programming-languages/">Programming Languages</a> · <a href="/topic/web-and-mobile-development/">Web &amp; Mobile Development</a> · <a href="/topic/databases-and-data-engineering/">Databases &amp; Data Engineering</a> · <a href="/topic/security-and-cryptography/">Security &amp; Cryptography</a> · <a href="/topic/science-and-engineering/">Science &amp; Engineering</a> · <a href="/topic/business-finance-and-economics/">Business, Finance &amp; Economics</a> · <a href="/topic/design-and-creative/">Design &amp; Creative</a> · <a href="/topic/humanities-and-social-science/">Humanities &amp; Social Science</a> · <a href="/topic/general-learning/">General Learning</a></nav>
 </footer>
 

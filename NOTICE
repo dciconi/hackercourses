@@ -24,5 +24,12 @@ This project uses data from the following sources:
   https://github.com/HackerNews/API
   Thread titles for recent comments.
 
-Hacker News comments remain the property of their authors and are not licensed by this
-project. Hacker Courses is not affiliated with Y Combinator or Hacker News.
+- Subreddit comments/submissions 2005-06 to 2023-12 (per-subreddit Reddit dump, top 40k subreddits),
+  compiled by Watchful1 and shared on Academic Torrents
+  https://academictorrents.com/details/56aa49f9653ba545f48df2e33679f014d2829c10
+  Reddit comments from 2005-06 to 2023-12. No license or terms were published with this dump.
+  The comments belong to their authors under Reddit's User Agreement
+  https://www.redditinc.com/policies/user-agreement
+
+Hacker News and Reddit comments remain the property of their authors and are not licensed by this
+project. Hacker Courses is not affiliated with Y Combinator, Hacker News or Reddit.

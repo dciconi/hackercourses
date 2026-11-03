@@ -6,8 +6,8 @@ For each course, try its best link (from summarize.py), then the course links in
   large image on the page (skipping logos, icons, avatars, sprites).
 Every candidate image is downloaded once to check it is real and at least 300px wide. Landscape
 images need 300x150; portrait or square ones are allowed (MIT OCW uses them) and are cropped from
-the top on the site. Images shared by 3+ courses are site-wide defaults, not course art, and are
-dropped. Courses without an image get their topic placeholder on the site.
+the top on the site. Images shared by 3+ courses from the same source (HN or Reddit) are
+site-wide defaults, not course art, and are dropped. Courses without an image get their topic placeholder on the site.
 
 The site hotlinks these URLs; nothing is re-hosted.
 """
@@ -24,6 +24,7 @@ from urllib.request import Request, urlopen
 
 from PIL import Image
 
+from canonicalize import CATALOG, origin
 from classify import ROOT
 from summarize import SUMMARIES, course_comments
 
@@ -161,15 +162,22 @@ def main():
                 OUT.write_text(json.dumps(done, indent=0), encoding="utf-8")
                 print(f"{n}/{len(jobs)}  found {sum(1 for v in done.values() if v)}", flush=True)
 
-    # The same picture on several courses is a site-wide default, not course art.
-    shared = Counter(v["src"] for v in done.values() if v)
-    for k, v in done.items():
-        if v and shared[v["src"]] >= 3:
-            done[k] = None
+    cat = json.loads(CATALOG.read_text(encoding="utf-8"))
+    dropped = drop_shared(done, {str(c["id"]): origin(c) for c in cat["courses"]})
     OUT.write_text(json.dumps(done, indent=0), encoding="utf-8")
     found = sum(1 for v in done.values() if v)
-    print(f"done: {found} of {len(done)} courses have an image "
-          f"({sum(1 for n in shared.values() if n >= 3)} shared defaults dropped)", flush=True)
+    print(f"done: {found} of {len(done)} courses have an image ({dropped} shared defaults dropped)",
+          flush=True)
+
+
+def drop_shared(done, origins):
+    """The same picture on several courses is a site-wide default, not course art. Counted per
+    source, so Reddit entries (often near-duplicates of HN ones) never drop an HN course's art."""
+    shared = Counter((origins.get(k, "hn"), v["src"]) for k, v in done.items() if v)
+    for k, v in done.items():
+        if v and shared[(origins.get(k, "hn"), v["src"])] >= 3:
+            done[k] = None
+    return sum(1 for n in shared.values() if n >= 3)
 
 
 if __name__ == "__main__":

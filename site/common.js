@@ -31,7 +31,19 @@
     return s.has(id);
   }
 
-  window.HC = { load, store, toggleTheme, saved, toggleSaved };
+  // Which source the visitor last chose (Hacker News or Reddit). Anything unexpected means "hn".
+  const source = () => (load("hc.source", "hn") === "reddit" ? "reddit" : "hn");
+
+  window.HC = { load, store, toggleTheme, saved, toggleSaved, source };
+
+  // Remember the choice before navigating. Capture phase, so it runs even if a page handler stops the click.
+  document.addEventListener("click", (e) => {
+    const a = e.target instanceof Element && e.target.closest(".source-switch a");
+    if (a && a.dataset.source) store("hc.source", a.dataset.source);
+  }, true);
+
+  // Only the home page redirects; /reddit/ never does, so the switch back to Hacker News cannot loop.
+  if (location.pathname === "/" && source() === "reddit") location.replace("/reddit/" + location.search);
 
   // Pre-rendered cards (topic pages, the grid before app.js runs) swap a broken remote image
   // for their topic illustration. Image errors don't bubble, so listen in the capture phase.

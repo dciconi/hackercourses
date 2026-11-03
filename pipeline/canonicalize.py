@@ -5,17 +5,19 @@
    already in the catalog or added as a new one. The catalog grows as it goes, so
    later (rarer) spellings can attach to the popular canonical entries.
 
-Writes data/catalog.json: {"courses": [{id, name, provider}], "aliases": {"name|provider": id}}.
+Writes data/catalog.json: {"courses": [{id, name, provider, origin?}], "aliases": {"name|provider": id}}.
+The catalog is shared by both sources (--source hn|reddit); entries record the source that created
+them in "origin" (missing means hn).
 Resumable: aliases already mapped are kept.
 """
 
+import argparse
 import json
 import re
-import sys
 from collections import Counter, defaultdict
 
-from classify import OUT_JSON, ROOT
 from llm import HAIKU, SONNET, api_key, structured
+from sources import ROOT, SOURCES, paths
 
 CATALOG = ROOT / "data" / "catalog.json"
 BATCH = 80
@@ -95,7 +97,7 @@ def compatible(a, b):
     return True
 
 
-SYSTEM = """You maintain a catalog of courses recommended on a programming forum. You get the current
+SYSTEM = """You maintain a catalog of courses recommended on online forums. You get the current
 catalog (id | name | provider) and a batch of newly seen course references (each with its mention
 count and spelling variants). For each reference decide whether it is the same course as an existing
 catalog entry, or a new course.
@@ -213,20 +215,89 @@ def dedupe(cat, key):
     print(f"dedupe: merged {merged} entries, ${cost:.3f}", flush=True)
 
 
+def origin(course):
+    return course.get("origin", "hn")
+
+
+def dedupe_reddit(cat, key):
+    """Like dedupe, but only for Reddit-created entries: existing merges are kept, a Reddit entry
+    joins the HN entry of its group when there is one, and a cluster holding an hn entry is never
+    merged into anything (so two hn entries are never joined)."""
+    live = [c for c in cat["courses"] if "merged_into" not in c]
+    listing = "\n".join(f"{c['id']} | {c['name']} | {c['provider']}" for c in sorted(live, key=lambda c: norm(c["name"])))
+    result, cost = structured(key, DEDUPE_MODEL, DEDUPE_SYSTEM, f"<catalog>\n{listing}\n</catalog>",
+                              DEDUPE_SCHEMA, max_tokens=16000, effort="medium")
+    ids = {c["id"] for c in live}
+
+    def has_hn(root):
+        return any(origin(c) == "hn" for c in cat["courses"] if resolve(cat, c["id"]) == root)
+
+    merged = 0
+    for group in result["groups"]:
+        group = [i for i in group if i in ids]
+        if len(group) < 2:
+            continue
+        # Keep the HN cluster when there is one, whatever order the model listed the ids in.
+        keeper = next((i for i in group if has_hn(resolve(cat, i))), group[0])
+        for other in group:
+            code_map = entry_codes(cat)
+            keep_c, dup_c = cat["courses"][resolve(cat, keeper)], cat["courses"][resolve(cat, other)]
+            # Only Reddit-only clusters move; an HN-containing cluster is never merged into anything.
+            if keep_c["id"] == dup_c["id"] or origin(dup_c) != "reddit" or has_hn(dup_c["id"]):
+                continue
+            if compatible(with_codes(keep_c, code_map), with_codes(dup_c, code_map)):
+                merge_into(cat, keep_c["id"], dup_c["id"])
+                merged += 1
+    print(f"dedupe-reddit: merged {merged} entries, ${cost:.3f}", flush=True)
+
+
+def load_catalog():
+    return json.loads(CATALOG.read_text(encoding="utf-8"))
+
+
+def save_catalog(cat):
+    CATALOG.write_text(json.dumps(cat, ensure_ascii=False, indent=0), encoding="utf-8")
+
+
+def parse_args(argv=None):
+    ap = argparse.ArgumentParser(description="Map course names to canonical catalog entries.")
+    ap.add_argument("--source", choices=SOURCES, default="hn")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--dedupe", action="store_true",
+                      help="HN-wide: clear every merge and dedupe the whole catalog again")
+    mode.add_argument("--dedupe-reddit", action="store_true",
+                      help="dedupe Reddit-created entries only; HN entries and merges are kept")
+    ap.add_argument("limit", nargs="?", type=int, help="map at most this many pre-merged names")
+    args = ap.parse_args(argv)
+    if args.dedupe and args.source != "hn":
+        ap.error("--dedupe is HN-wide; use --dedupe-reddit for Reddit entries")
+    return args
+
+
 def main():
+    args = parse_args()
     key = api_key()
-    if sys.argv[1:2] == ["--dedupe"]:
-        cat = json.loads(CATALOG.read_text(encoding="utf-8"))
+    if args.dedupe_reddit:
+        cat = load_catalog()
+        dedupe_reddit(cat, key)
+        save_catalog(cat)
+        return
+    if args.dedupe:
+        cat = load_catalog()
+        if any(origin(c) == "reddit" for c in cat["courses"]):
+            raise SystemExit("--dedupe clears every merge, including Reddit ones; the catalog has Reddit "
+                             "entries, so use --dedupe-reddit instead")
         for c in cat["courses"]:  # merges are links only, so a re-run starts clean
             c.pop("merged_into", None)
         dedupe(cat, key)
-        CATALOG.write_text(json.dumps(cat, ensure_ascii=False, indent=0), encoding="utf-8")
+        save_catalog(cat)
         return
-    comments = json.loads(OUT_JSON.read_text(encoding="utf-8"))
+    source = args.source
+    comments = json.loads(paths(source).courses.read_text(encoding="utf-8"))
     groups = premerge(comments)
-    cat = json.loads(CATALOG.read_text(encoding="utf-8")) if CATALOG.exists() else {"courses": [], "aliases": {}}
+    cat = load_catalog() if CATALOG.exists() else {"courses": [], "aliases": {}}
     todo = [g for g in groups if not all(v in cat["aliases"] for v in g["variants"])]
-    limit = int(sys.argv[1]) if len(sys.argv) > 1 else len(todo)
+    limit = args.limit if args.limit is not None else len(todo)
     todo = todo[:limit]
     print(f"{len(groups)} pre-merged names, {len(todo)} to map, catalog has {len(cat['courses'])}", flush=True)
 
@@ -256,11 +327,15 @@ def main():
                 target = r["match_id"]
             else:
                 target = len(cat["courses"])
-                cat["courses"].append({"id": target, "name": r["name"] or g["name"], "provider": r["provider"] or g["provider"]})
+                cat["courses"].append({"id": target, "name": r["name"] or g["name"], "provider": r["provider"] or g["provider"],
+                                   "origin": source})
                 valid_ids.add(target)
             for v in g["variants"]:
-                cat["aliases"][v] = target
-        CATALOG.write_text(json.dumps(cat, ensure_ascii=False, indent=0), encoding="utf-8")
+                if source == "hn":
+                    cat["aliases"][v] = target
+                else:  # a Reddit run only adds aliases; ones HN already mapped are never rewritten
+                    cat["aliases"].setdefault(v, target)
+        save_catalog(cat)
         print(f"{min(start + BATCH, len(todo))}/{len(todo)}  catalog={len(cat['courses'])}  ${cost:.3f}", flush=True)
 
 

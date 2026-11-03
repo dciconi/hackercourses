@@ -1,20 +1,28 @@
 """Per-course LLM pass: blurb, facets, best link and the stance of every comment.
 
-Needs data/catalog.json (canonicalize.py), data/courses.json (classify.py) and
-data/threads.json (threads.py). Writes data/summaries.jsonl, one line per course; resumable.
+Needs data/catalog.json (canonicalize.py), courses.json (classify.py) and threads.json (threads.py).
+Writes one line per course to the source's summaries.jsonl; resumable.
+
+    uv run python pipeline/summarize.py [N]                  Hacker News -> data/summaries.jsonl
+    uv run python pipeline/summarize.py --source reddit [N]  Reddit -> data/reddit/summaries.jsonl
+
+A Reddit run never touches the HN summaries; for a course that already has an HN summary,
+build.py takes only the `stances` of the Reddit line.
 """
 
+import argparse
+import copy
 import json
-import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from canonicalize import CATALOG, alias_key, resolve
-from classify import OTHER, OUT_JSON, ROOT, TOPICS
+import sources
+from classify import OTHER, TOPICS
 from llm import HAIKU, api_key, structured
 
-SUMMARIES = ROOT / "data" / "summaries.jsonl"
-THREADS = ROOT / "data" / "threads.json"
+SUMMARIES = sources.paths("hn").summaries
+THREADS = sources.paths("hn").threads
 MODEL = HAIKU
 WORKERS = 16
 MAX_COMMENTS = 30  # most-discussed courses: the longest 30 comments carry the signal
@@ -22,7 +30,7 @@ TOPIC_NAMES = [name for name, _ in TOPICS] + [OTHER]
 STANCES = ["strongly_recommends", "recommends", "mentions", "criticizes"]
 
 SYSTEM = """You write the catalog entry for one course on a site that collects courses recommended in
-programming-forum comments. You get the course name and provider and the comments that mention it.
+forum comments. You get the course name and provider and the comments that mention it.
 Use only what the comments say plus well-established public facts about the course; never invent
 details. Write plainly, no hype.
 
@@ -63,16 +71,33 @@ SCHEMA = {
 }
 
 
-def course_comments():
-    """canonical course id -> comments mentioning it (each comment once per course)."""
+def schema_for(source):
+    """HN comment ids are integers; Reddit's are strings like "t1_abc"."""
+    if source == "hn":
+        return SCHEMA
+    sch = copy.deepcopy(SCHEMA)
+    sch["properties"]["stances"]["items"]["properties"]["comment_id"] = {"type": "string"}
+    return sch
+
+
+def course_comments(source=None):
+    """canonical course id -> comments mentioning it (each comment once per course).
+
+    One source's courses.json, or both when source is None (a missing file is skipped).
+    Items without `src` are tagged "hn". HN ids are ints, Reddit ids strings ("t1_abc").
+    """
     cat = json.loads(CATALOG.read_text(encoding="utf-8"))
-    comments = json.loads(OUT_JSON.read_text(encoding="utf-8"))
     out = defaultdict(dict)
-    for it in comments:
-        for c in it.get("courses", []):
-            cid = cat["aliases"].get(alias_key(c))
-            if cid is not None:
-                out[resolve(cat, cid)][it["id"]] = it
+    for src in ([source] if source else sources.SOURCES):
+        f = sources.paths(src).courses
+        if not f.exists() and not source:
+            continue
+        for it in json.loads(f.read_text(encoding="utf-8")):
+            it.setdefault("src", "hn")
+            for c in it.get("courses", []):
+                cid = cat["aliases"].get(alias_key(c))
+                if cid is not None:
+                    out[resolve(cat, cid)][it["id"]] = it
     return cat, {cid: list(v.values()) for cid, v in out.items()}
 
 
@@ -89,45 +114,67 @@ def build_prompt(course, comments, threads):
     return "\n".join(parts), links, chosen
 
 
-def summarize(course, comments, threads, key):
+def summarize(course, comments, threads, key, source="hn"):
     user, links, chosen = build_prompt(course, comments, threads)
-    out, cost = structured(key, MODEL, SYSTEM, user, SCHEMA, max_tokens=4096)
+    out, cost = structured(key, MODEL, SYSTEM, user, schema_for(source), max_tokens=4096)
     idx = out.pop("url_index")
     out["url"] = links[idx] if isinstance(idx, int) and 0 <= idx < len(links) else None
     valid = {it["id"] for it in chosen}
-    out["stances"] = {str(s["comment_id"]): s["stance"] for s in out["stances"] if s["comment_id"] in valid}
+    by_str = {str(i): i for i in valid}  # a stray "42" for int 42 must not drop the stance
+    out["stances"] = {str(s["comment_id"]): s["stance"] for s in out["stances"] if str(s["comment_id"]) in by_str}
     out["id"] = course["id"]
-    out["comment_ids"] = sorted(valid)  # lets a later run tell when the course gained comments
+    out["comment_ids"] = (sorted(valid) if len({type(i) for i in valid}) < 2 else sorted(valid, key=str))  # lets a later run tell when the course gained comments
     return out, cost
 
 
 def covered(summary):
-    return set(summary.get("comment_ids") or map(int, summary["stances"]))
+    return set(summary.get("comment_ids") or (int(k) if k.isdigit() else k for k in summary["stances"]))
 
 
 def chosen_ids(comments):
     return {it["id"] for it in sorted(comments, key=lambda it: -len(it["text"]))[:MAX_COMMENTS]}
 
 
-def main():
-    key = api_key()
-    threads = json.loads(THREADS.read_text(encoding="utf-8")) if THREADS.exists() else {}
-    cat, by_course = course_comments()
+def load(source):
+    """course id -> its latest summary line for one source ({} when there is no file)."""
+    f = sources.paths(source).summaries
     done = {}  # later lines win: a re-summarized course is appended again
-    if SUMMARIES.exists():
-        for line in SUMMARIES.open(encoding="utf-8"):
+    if f.exists():
+        for line in f.open(encoding="utf-8"):
             s = json.loads(line)
             done[s["id"]] = s
+    return done
+
+
+def listable_on_reddit(items):
+    """A Reddit course is only listed with enough distinct recommenders (build.py), so a course
+    with fewer distinct Reddit authors is not worth a summary."""
+    from build import REDDIT_MIN_RECOMMENDERS  # build imports this module, so import late
+    return len({it["by"] for it in items if it["src"] == "reddit"}) >= REDDIT_MIN_RECOMMENDERS
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--source", choices=sources.SOURCES, default="hn")
+    ap.add_argument("limit", nargs="?", type=int)
+    args = ap.parse_args()
+    p = sources.paths(args.source)
+    key = api_key()
+    threads = json.loads(p.threads.read_text(encoding="utf-8")) if p.threads.exists() else {}
+    cat, by_course = course_comments(args.source)
+    done = load(args.source)
+    if args.source == "reddit":
+        by_course = {cid: items for cid, items in by_course.items() if listable_on_reddit(items)}
     # New courses, plus courses whose comments changed since they were summarized.
     todo = sorted((cid for cid in by_course
                    if cid not in done or not chosen_ids(by_course[cid]) <= covered(done[cid])),
                   key=lambda cid: -len(by_course[cid]))
-    if len(sys.argv) > 1:
-        todo = todo[: int(sys.argv[1])]
+    if args.limit is not None:
+        todo = todo[: args.limit]
     print(f"{len(by_course)} courses, {len(todo)} to summarize", flush=True)
     cost, n = 0.0, 0
-    with ThreadPoolExecutor(WORKERS) as ex, SUMMARIES.open("a", encoding="utf-8") as f:
-        futures = [ex.submit(summarize, cat["courses"][cid], by_course[cid], threads, key) for cid in todo]
+    with ThreadPoolExecutor(WORKERS) as ex, p.summaries.open("a", encoding="utf-8") as f:
+        futures = [ex.submit(summarize, cat["courses"][cid], by_course[cid], threads, key, args.source) for cid in todo]
         for fut in as_completed(futures):
             try:
                 out, c = fut.result()

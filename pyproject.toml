@@ -2,7 +2,8 @@
 name = "hacker-courses"
 version = "0.1.0"
 description = "The online courses programmers keep recommending, ranked from Hacker News comments."
-license = "MIT"
+license = "MIT AND CC-BY-4.0"
+license-files = ["LICENSE", "NOTICE", "DATA-LICENSE.md"]
 requires-python = ">=3.13"
 dependencies = [
     "duckdb>=2.0.0",
