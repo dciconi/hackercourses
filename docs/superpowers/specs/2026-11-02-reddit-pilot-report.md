@@ -191,3 +191,44 @@ I would apply these after the full history run so the badge counts can be checke
 1. **Tighten the Reddit review prompt** to reject questions asked by the person seeking advice, generic advice with no named course, and single videos or talks. The whole review costs about $1 per pilot, so a re-run is cheap.
 2. **Run a second merge pass** for duplicate course names (see the top 50 notes).
 3. Decisions needed from you: which subreddits to drop, and whether to run full history (dump 2005 to 2020, plus the 2024 to 2026 API).
+
+## Full history (2005 to 2023, local dump)
+
+Run on the full local dump (no API; 2024 onwards still held). Fetch took 59m39s; 752,450 candidate comments (270k in the pilot).
+
+- **Funnel:** 27,154 pool comments reviewed (9,660 pilot + 17,494 new); 18,222 kept as recommendations, 8,401 "not a recommendation", 435 spam after the Sonnet recheck (631 flagged, 333 cleared).
+- **Listed Reddit courses (2+ recommenders): 934** (pilot 383; projection was 800 to 1,300). 674 exist only on Reddit and have their own page. The union site has 2,050 courses and 2,127 files (limit 19,000).
+- **Spend: about $8.70** in AI calls (pilot projection $8, range $6 to $11); gate was $15. Sample $0.029, review $1.644, spam recheck $0.921, canonicalize $4.895 (6,061 names; about 12x the pilot per name because the catalog is larger), dedupe $0.372 + $0.357 (second pass), summaries $0.433 + $0.048.
+- **Badges** with the proposed thresholds applied (rising_min 5, rising_share 0.7, gem_strong 0.8), counted on the first build (939 courses): before (HN rules) classic 21, evergreen 79, rising 121, hidden gem 11; after: classic 21, evergreen 79, rising 54, hidden gem 10. Final build (934 courses) after the second dedupe: classic 21, evergreen 81, rising 50, hidden gem 10.
+- **HN:** id, rank and score identical for all 1,376 courses. 41 HN courses lost their image (see concerns in the task report): the image step drops pictures shared by 3 or more courses, and Reddit-only courses now share some.
+- **Remaining duplicates:** the MIT 6.0001 family still appears several times: "Introduction to Computer Science and Programming in Python" (rank 5), "6.0001 ..." (22), "6.00 ... MITx" (41) and "6.001x ... edX" (48). The Odin Project Foundations and Full Stack are kept apart (distinct tracks). The CS50P duplicate and the 6.0001/edX pair from the pilot are gone from the top 50 apart from the MIT family above. A second dedupe pass merged 127 more entries.
+
+### Top 25 Reddit courses
+
+| Rank | Course | Provider | Recommenders | Score | Badges |
+|---:|---|---|---:|---:|---|
+| 1 | CS50: Introduction to Computer Science | Harvard University | 2011 | 2981.7 | classic, evergreen |
+| 2 | Machine Learning (Andrew Ng) | Coursera | 1179 | 1810.7 | classic, evergreen |
+| 3 | The Web Developer Bootcamp | Udemy | 553 | 616.6 | - |
+| 4 | Practical Deep Learning for Coders | fast.ai | 324 | 434.4 | classic, evergreen |
+| 5 | Introduction to Computer Science and Programming in Python | MIT OpenCourseWare | 263 | 411.4 | classic, evergreen |
+| 6 | Learning How to Learn: Powerful mental tools to help you master tough subjects | Coursera | 241 | 323.1 | classic, evergreen |
+| 7 | Deep Learning Specialization (Andrew Ng) | Coursera | 253 | 279.8 | - |
+| 8 | Algorithms, Part I | Coursera | 182 | 261.8 | classic, evergreen |
+| 9 | 6.006 Introduction to Algorithms | MIT OpenCourseWare | 131 | 217.1 | classic, evergreen |
+| 10 | The Elements of Computing Systems (Nand2Tetris) | nand2tetris.org | 154 | 211.4 | classic, evergreen |
+| 11 | CS101 Introduction to Computer Science | Coursera | 153 | 210.5 | classic, evergreen |
+| 12 | CS229 Machine Learning | Stanford University | 127 | 209.5 | classic, evergreen |
+| 13 | Learn Python | Codecademy | 132 | 184.2 | classic, evergreen |
+| 14 | The Complete Web Developer Course (Angela Yu) | Udemy | 146 | 180.0 | classic, evergreen |
+| 15 | Responsive Web Design | freeCodeCamp | 138 | 176.3 | classic, evergreen |
+| 16 | An Introduction to Interactive Programming in Python | Coursera | 121 | 174.2 | classic, evergreen |
+| 17 | 18.06 Linear Algebra (Gilbert Strang) | MIT OpenCourseWare | 105 | 169.9 | classic, evergreen |
+| 18 | CS231n: Convolutional Neural Networks for Visual Recognition | Stanford University | 134 | 168.6 | classic, evergreen |
+| 19 | 6.001 Structure and Interpretation of Computer Programs | MIT OpenCourseWare | 77 | 144.4 | classic, evergreen |
+| 20 | Automate the Boring Stuff with Python | Udemy | 117 | 137.9 | - |
+| 21 | CS61A: Structure and Interpretation of Computer Programs | UC Berkeley | 73 | 135.6 | classic, evergreen |
+| 22 | 6.0001 Introduction to Computer Science and Programming in Python | MIT OCW | 86 | 127.3 | classic, evergreen |
+| 23 | CS50's Web Programming with Python and JavaScript | edX | 103 | 121.9 | classic, evergreen |
+| 24 | The Complete JavaScript Course: Build a Real-World Project | Udemy | 110 | 121.5 | rising |
+| 25 | JavaScript and jQuery | Codecademy | 77 | 110.1 | classic, evergreen |
