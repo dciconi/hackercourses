@@ -9,3 +9,6 @@ data_*.log
 .venv/
 __pycache__/
 .pytest_cache/
+
+# wrangler local state
+.wrangler/

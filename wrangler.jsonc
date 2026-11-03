@@ -1,0 +1,11 @@
+// Cloudflare Workers static-assets deploy. Used by Workers Builds for main (wrangler deploy)
+// and for preview branches (wrangler versions upload). site/_headers is applied as-is.
+{
+  "name": "hackercourses",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./site",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}
