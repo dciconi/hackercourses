@@ -35,7 +35,9 @@ YEAR = 365.25 * 24 * 3600
 UPVOTE_MIN_AGE = 30 * 24 * 3600
 _HN_RULES = {"classic_span": 8, "evergreen_years": 6, "evergreen_span": 8, "rising_min": 3,
              "rising_share": 0.6, "gem_min": 2, "gem_max": 4, "gem_strong": 0.75}
-BADGE_RULES = {"hn": dict(_HN_RULES), "reddit": dict(_HN_RULES)}
+# Reddit: stricter "rising" (full 2005-2023 history makes a 3-year window selective) and "hidden gem".
+_REDDIT_RULES = {**_HN_RULES, "rising_min": 5, "rising_share": 0.7, "gem_strong": 0.8}
+BADGE_RULES = {"hn": dict(_HN_RULES), "reddit": _REDDIT_RULES}
 
 
 def upvote_factor(ups, age):

@@ -74,6 +74,22 @@ def test_badge_rules_per_source():
          "strong_share": 0.0, "recent_share": 0.6}
     assert set(rank.BADGE_RULES) == {"hn", "reddit"}
     assert rank.badges(c, 0, 100, 0) == rank.badges(c, 0, 100, 0, source="hn")
+    assert "rising" in rank.badges(c, 0, 100, 0, source="hn")
+    assert "rising" not in rank.badges(c, 0, 100, 0, source="reddit")
+
+
+def test_reddit_badge_thresholds():
+    assert {k: v for k, v in rank.BADGE_RULES["reddit"].items()
+            if k in ("rising_min", "rising_share", "gem_strong")} == {
+        "rising_min": 5, "rising_share": 0.7, "gem_strong": 0.8}
+    base = {"recommenders": 5, "years_active": 1, "first": 1_600_000_000, "last": 1_700_000_000,
+            "strong_share": 0.0, "recent_share": 0.7}
+    assert "rising" in rank.badges(base, 50, 100, 0, source="reddit")
+    assert "rising" not in rank.badges({**base, "recommenders": 4}, 50, 100, 0, source="reddit")
+    assert "rising" not in rank.badges({**base, "recent_share": 0.69}, 50, 100, 0, source="reddit")
+    gem = {**base, "recommenders": 3, "recent_share": 0.0}
+    assert "hidden gem" not in rank.badges({**gem, "strong_share": 0.79}, 50, 100, 0, source="reddit")
+    assert "hidden gem" in rank.badges({**gem, "strong_share": 0.8}, 50, 100, 0, source="reddit")
 
 
 def test_author_keeps_strongest_weighted_vote_and_strongest_stance():
